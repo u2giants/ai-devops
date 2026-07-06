@@ -92,6 +92,29 @@ total including subagent logs). Mirrors `C:\Users\...\.claude\projects\`.
 Additionally, `_desktop-cowork-sessions/` holds Claude Desktop cowork-mode sessions
 (4 `.jsonl` files).
 
+### `916/`
+
+Windows machine (`916-alien`). 23 CLI sessions across 10 project folders (some metadata-only),
+~38 MB. Mirrors `C:\Users\ahazan2\.claude\projects\` (folders use the Windows-encoded form, e.g.
+`D:\repos\oracle` → `D--repos-oracle`).
+
+| Project folder | Transcripts |
+|---|---:|
+| `C--PopDAM-popdam3` | 0 (metadata only) |
+| `D--openclaw` | 0 (metadata only) |
+| `D--popdam-claude-supabase-mcp` | 0 (metadata only) |
+| `D--repos-dflow-alsand2` | 3 |
+| `D--repos-dflow` | 12 |
+| `D--repos-oracle` | 5 |
+| `D--repos-temp-edgesynology2` | 1 |
+| `D--repos-temp-random` | 2 |
+| `D--repos-vibeflow` | 0 (metadata only) |
+| `D--synology-monitor` | 0 (metadata only) |
+
+Additionally, `local-agent-mode-sessions/` holds 15 Claude Desktop embedded-Code sandbox
+sessions (54 `.jsonl` files total including subagent logs), backed up from
+`%APPDATA%\Claude\local-agent-mode-sessions\`.
+
 ## Keeping it synced
 
 Run [`sync.sh`](./sync.sh) on the machine whose transcripts you want to back up. It copies the local
