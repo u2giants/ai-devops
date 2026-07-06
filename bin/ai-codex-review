@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# ai-codex-review — read-only Codex second-opinion review.
+#
+# Usage:
+#   ai-codex-review plan-review
+#   ai-codex-review diff-review
+#   ai-codex-review security-review
+#   ai-codex-review visual-review
+#   ai-codex-review final-check
+#
+# Behaviour:
+#   - Must be run inside a git repo.
+#   - Reads /etc/ai-devops/models.env if present (for CODEX_CMD).
+#   - Creates .ai/reviews/ if missing.
+#   - Saves output to .ai/reviews/YYYYMMDD-HHMMSS-MODE.md and prints the path.
+#   - Reviews are READ-ONLY: this script never commits, pushes, merges, or
+#     deletes anything, and instructs the model to do the same.
+
+set -uo pipefail
+
+MODE="${1:-}"
+MODELS_ENV="/etc/ai-devops/models.env"
+
+# Default Codex command; overridden by CODEX_CMD in models.env if set.
+CODEX_CMD="codex exec --skip-git-repo-check"
+# shellcheck source=/dev/null
+[ -f "$MODELS_ENV" ] && . "$MODELS_ENV" 2>/dev/null || true
+
+usage() {
+  cat <<EOF
+Usage: ai-codex-review <mode>
+
+Modes:
+  plan-review       Review the current plan (.ai/plan.md or staged plan)
+  diff-review       Review the current git diff
+  security-review   Security-focused review of the current diff
+  visual-review     Review visual/UI testing considerations for the diff
+  final-check       Final go/no-go readiness review
+
+Reviews are read-only. Output is saved under .ai/reviews/.
+EOF
+}
+
+case "$MODE" in
+  plan-review|diff-review|security-review|visual-review|final-check) ;;
+  ""|-h|--help|help) usage; exit 0 ;;
+  *) echo "Unknown mode: $MODE" >&2; echo >&2; usage >&2; exit 2 ;;
+esac
+
+# Must be in a git repo.
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "ai-codex-review must be run inside a git repository." >&2
+  exit 1
+fi
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT" || exit 1
+
+REVIEW_DIR="$REPO_ROOT/.ai/reviews"
+mkdir -p "$REVIEW_DIR"
+
+TS="$(date +%Y%m%d-%H%M%S)"
+OUT="$REVIEW_DIR/${TS}-${MODE}.md"
+
+# --- Build the review context (read-only gathering) ------------------------
+gather_diff() {
+  # Prefer staged+unstaged diff vs HEAD; fall back to full diff.
+  git --no-pager diff HEAD 2>/dev/null
+}
+
+READONLY_GUARD='You are performing a READ-ONLY review. Do NOT edit, create, commit, push, merge, or delete any files. Only produce the written review below.'
+
+case "$MODE" in
+  plan-review)
+    PLAN_FILE=""
+    for cand in .ai/plan.md .ai/current-plan.md PLAN.md; do
+      [ -f "$REPO_ROOT/$cand" ] && PLAN_FILE="$REPO_ROOT/$cand" && break
+    done
+    CONTEXT="Plan file: ${PLAN_FILE:-<none found>}
+$( [ -n "$PLAN_FILE" ] && cat "$PLAN_FILE" || echo 'No plan file found (.ai/plan.md). Review whatever plan context is available in the repo.')"
+    INSTRUCT="Review this implementation PLAN. Find missing edge cases, bad assumptions, database/auth/security risks, forgotten files, and testing gaps. End with a verdict: APPROVE / APPROVE WITH CHANGES / BLOCK."
+    ;;
+  diff-review)
+    CONTEXT="Current git diff (HEAD):
+$(gather_diff)"
+    INSTRUCT="Review this git DIFF. Focus on correctness, regressions, auth/data leakage, missing tests, overbroad changes, and mismatch with the intended plan. End with a verdict: APPROVE / APPROVE WITH CHANGES / BLOCK."
+    ;;
+  security-review)
+    CONTEXT="Current git diff (HEAD):
+$(gather_diff)"
+    INSTRUCT="Perform a SECURITY-ONLY review of this diff: auth bypass, tenant/data leakage, unsafe SQL, secrets in code, unsafe file access, environment-variable handling, RLS/policy mistakes, and permission mistakes. List concrete findings with severity. End with a verdict: APPROVE / APPROVE WITH CHANGES / BLOCK."
+    ;;
+  visual-review)
+    CONTEXT="Current git diff (HEAD):
+$(gather_diff)"
+    INSTRUCT="Review this diff for VISUAL/UI testing needs. Identify UI-affecting changes, what should be visually verified (Playwright/screenshots), responsive/accessibility concerns, and any missing visual tests. End with a verdict: APPROVE / APPROVE WITH CHANGES / BLOCK."
+    ;;
+  final-check)
+    CONTEXT="Current git diff (HEAD):
+$(gather_diff)
+
+Recent commits:
+$(git --no-pager log -5 --oneline 2>/dev/null)"
+    INSTRUCT="Perform a FINAL go/no-go readiness check. Is this ready for PR/merge? Summarize remaining risks, unfinished items, and give a clear GO or NO-GO with reasons."
+    ;;
+esac
+
+PROMPT="$READONLY_GUARD
+
+Repository: $REPO_ROOT
+Review mode: $MODE
+
+$INSTRUCT
+
+--- CONTEXT ---
+$CONTEXT
+--- END CONTEXT ---"
+
+# --- Write the review file header -----------------------------------------
+{
+  echo "# Codex review — $MODE"
+  echo
+  echo "- Repo: \`$REPO_ROOT\`"
+  echo "- Branch: \`$(git rev-parse --abbrev-ref HEAD 2>/dev/null)\`"
+  echo "- Timestamp: $TS"
+  echo "- Codex command: \`$CODEX_CMD\`"
+  echo
+  echo "---"
+  echo
+} > "$OUT"
+
+echo "Running Codex review ($MODE)…" >&2
+
+# --- Invoke Codex (best-effort) -------------------------------------------
+if command -v codex >/dev/null 2>&1; then
+  # Pass the prompt on stdin; append model output to the review file.
+  if printf '%s\n' "$PROMPT" | eval "$CODEX_CMD" >>"$OUT" 2>&1; then
+    :
+  else
+    {
+      echo
+      echo "> ⚠ Codex exited non-zero. Output (if any) is above; verify the model is logged in (\`codex login\`)."
+    } >>"$OUT"
+  fi
+else
+  {
+    echo "> ⚠ \`codex\` CLI not found on PATH. Review prompt saved below for manual use."
+    echo
+    echo '```'
+    printf '%s\n' "$PROMPT"
+    echo '```'
+  } >>"$OUT"
+fi
+
+echo "$OUT"

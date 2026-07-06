@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# ai-model-call — generic model invocation helper (v0.1 scaffolding).
+#
+# Loads the model command for a named stage from /etc/ai-devops/models.env,
+# feeds it a prompt file, and writes the model's output to an output file.
+#
+# Usage:
+#   ai-model-call <stage> <prompt-file> <output-file>
+#
+# <stage> is one of the logical stage names below; each maps to a *_CMD
+# variable in models.env:
+#
+#   plan        -> OPUS48_HIGH_REASONING_CMD
+#   plan-review -> OPUS_REVIEW_CMD
+#   implement   -> GPT55_CMD
+#   diff-review -> OPUS_REVIEW_CMD
+#   test        -> TESTER_CMD
+#   security    -> OPUS_REVIEW_CMD
+#   final       -> OPUS48_HIGH_REASONING_CMD
+#
+# This is intentionally simple. It does not orchestrate stages — it just runs
+# one model against one prompt. Higher-level orchestration comes later.
+
+set -uo pipefail
+
+STAGE="${1:-}"
+PROMPT_FILE="${2:-}"
+OUT_FILE="${3:-}"
+
+usage() {
+  cat <<EOF
+Usage: ai-model-call <stage> <prompt-file> <output-file>
+
+Stages:
+  plan         Opus 4.8 high reasoning — implementation plan / architecture
+  plan-review  Opus — review the plan
+  implement    GPT-5.5 / Codex — write code
+  diff-review  Opus — review the diff
+  test         GPT-5.5 / Codex — run & fix tests
+  security     Opus — security review
+  final        Opus 4.8 high reasoning — final product/architecture review
+EOF
+}
+
+if [ -z "$STAGE" ] || [ "$STAGE" = "-h" ] || [ "$STAGE" = "--help" ]; then
+  usage; exit 0
+fi
+if [ -z "$PROMPT_FILE" ] || [ -z "$OUT_FILE" ]; then
+  echo "Error: prompt-file and output-file are required." >&2
+  echo >&2; usage >&2; exit 2
+fi
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo "Error: prompt file not found: $PROMPT_FILE" >&2
+  exit 1
+fi
+
+# Load model commands (non-fatal if missing; we validate the chosen one below).
+MODELS_ENV="/etc/ai-devops/models.env"
+# shellcheck source=/dev/null
+[ -f "$MODELS_ENV" ] && . "$MODELS_ENV" 2>/dev/null || true
+
+# Map stage -> command variable.
+case "$STAGE" in
+  plan)        CMD="${OPUS48_HIGH_REASONING_CMD:-}" ;;
+  plan-review) CMD="${OPUS_REVIEW_CMD:-}" ;;
+  implement)   CMD="${GPT55_CMD:-}" ;;
+  diff-review) CMD="${OPUS_REVIEW_CMD:-}" ;;
+  test)        CMD="${TESTER_CMD:-}" ;;
+  security)    CMD="${OPUS_REVIEW_CMD:-}" ;;
+  final)       CMD="${OPUS48_HIGH_REASONING_CMD:-}" ;;
+  *) echo "Unknown stage: $STAGE" >&2; echo >&2; usage >&2; exit 2 ;;
+esac
+
+if [ -z "$CMD" ]; then
+  echo "Error: no model command configured for stage '$STAGE'." >&2
+  echo "Set the matching *_CMD variable in $MODELS_ENV (see config/models.env.example)." >&2
+  exit 1
+fi
+
+echo "Stage   : $STAGE" >&2
+echo "Command : $CMD" >&2
+echo "Prompt  : $PROMPT_FILE" >&2
+echo "Output  : $OUT_FILE" >&2
+echo "Running…" >&2
+
+# Feed the prompt on stdin, capture output. `eval` so multi-word commands with
+# flags in models.env are honored.
+if printf '%s\n' "$(cat "$PROMPT_FILE")" | eval "$CMD" >"$OUT_FILE" 2>&1; then
+  echo "Done. Output written to: $OUT_FILE" >&2
+  echo "$OUT_FILE"
+else
+  rc=$?
+  echo "Model command exited non-zero ($rc). See $OUT_FILE for details." >&2
+  echo "$OUT_FILE"
+  exit "$rc"
+fi

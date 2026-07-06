@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# ai-devops — top-level control command for the AI DevOps toolkit.
+#
+# Subcommands:
+#   ai-devops doctor    Health-check dependencies, config, and companion tools
+#   ai-devops version   Print the toolkit version
+#   ai-devops paths     Print the paths this toolkit uses
+#
+# doctor never exits non-zero just because Claude or Codex is not logged in —
+# those are reported as WARNINGS, not failures.
+
+set -uo pipefail
+
+AI_DEVOPS_VERSION="0.1.0"
+AI_DEVOPS_HOME_DEFAULT="/worksp/ai-devops"
+AI_DEVOPS_ETC="/etc/ai-devops"
+MODELS_ENV="${AI_DEVOPS_ETC}/models.env"
+SERVER_ENV="${AI_DEVOPS_ETC}/server.env"
+
+# Resolve the repo home: prefer server.env, then models.env, then default.
+AI_DEVOPS_HOME="$AI_DEVOPS_HOME_DEFAULT"
+[ -f "$SERVER_ENV" ] && AI_DEVOPS_HOME="$(. "$SERVER_ENV" 2>/dev/null; echo "${AI_DEVOPS_HOME:-$AI_DEVOPS_HOME_DEFAULT}")"
+
+# --- pretty output helpers -------------------------------------------------
+c_ok()   { printf '  \033[32m[ OK ]\033[0m %s\n' "$1"; }
+c_warn() { printf '  \033[33m[WARN]\033[0m %s\n' "$1"; }
+c_fail() { printf '  \033[31m[FAIL]\033[0m %s\n' "$1"; }
+c_head() { printf '\n\033[1m%s\033[0m\n' "$1"; }
+
+FAILED=0
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+check_required() {
+  # $1 = command, $2 = human label
+  if have "$1"; then
+    c_ok "$2 installed ($(command -v "$1"))"
+  else
+    c_fail "$2 not found (required)"
+    FAILED=1
+  fi
+}
+
+check_optional() {
+  if have "$1"; then
+    c_ok "$2 installed ($(command -v "$1"))"
+  else
+    c_warn "$2 not found (optional)"
+  fi
+}
+
+check_file() {
+  # $1 = path, $2 = label, required?($3=req)
+  if [ -f "$1" ]; then
+    c_ok "$2 exists ($1)"
+  elif [ "${3:-}" = "req" ]; then
+    c_fail "$2 missing ($1)"
+    FAILED=1
+  else
+    c_warn "$2 missing ($1)"
+  fi
+}
+
+cmd_doctor() {
+  printf '\033[1mai-devops doctor\033[0m — v%s\n' "$AI_DEVOPS_VERSION"
+
+  c_head "Core tools"
+  check_required git   "git"
+  check_required jq    "jq"
+  check_required rg    "ripgrep (rg)"
+
+  c_head "Node / npm"
+  if have node; then c_ok "node installed ($(node --version 2>/dev/null))"; else c_warn "node not found (optional)"; fi
+  if have npm;  then c_ok "npm installed ($(npm --version 2>/dev/null))";  else c_warn "npm not found (optional)"; fi
+
+  c_head "GitHub CLI"
+  if have gh; then
+    c_ok "gh installed ($(command -v gh))"
+    if gh auth status >/dev/null 2>&1; then
+      c_ok "gh authenticated"
+    else
+      c_warn "gh not authenticated — run: gh auth login"
+    fi
+  else
+    c_fail "gh not found (required)"
+    FAILED=1
+  fi
+
+  c_head "AI model CLIs"
+  if have claude; then
+    c_ok "claude installed ($(command -v claude))"
+    # Best-effort login check; never fail doctor over it.
+    if claude --version >/dev/null 2>&1; then
+      c_ok "claude responds to --version"
+    else
+      c_warn "claude present but could not verify (may need: claude login)"
+    fi
+  else
+    c_warn "claude not found — install it and run: claude login"
+  fi
+
+  if have codex; then
+    c_ok "codex installed ($(command -v codex))"
+    if codex --version >/dev/null 2>&1; then
+      c_ok "codex responds to --version"
+    else
+      c_warn "codex present but could not verify (may need: codex login)"
+    fi
+  else
+    c_warn "codex not found — install it and run: codex login"
+  fi
+
+  c_head "Paths & config"
+  check_file "$AI_DEVOPS_HOME/README.md" "toolkit repo" req
+  if [ -d "$AI_DEVOPS_HOME" ]; then c_ok "repo dir exists ($AI_DEVOPS_HOME)"; else c_fail "repo dir missing ($AI_DEVOPS_HOME)"; FAILED=1; fi
+  check_file "$MODELS_ENV" "models.env" req
+  check_file "$SERVER_ENV" "server.env" req
+
+  c_head "Companion scripts"
+  for s in ai-codex-review ai-workspace-status ai-model-call ai-run-task; do
+    if have "$s"; then
+      c_ok "$s available ($(command -v "$s"))"
+    else
+      c_fail "$s not found on PATH"
+      FAILED=1
+    fi
+  done
+
+  echo
+  if [ "$FAILED" -eq 0 ]; then
+    printf '\033[32mdoctor: all required checks passed.\033[0m\n'
+  else
+    printf '\033[31mdoctor: one or more REQUIRED checks failed (warnings are OK).\033[0m\n'
+  fi
+  return "$FAILED"
+}
+
+cmd_version() {
+  echo "ai-devops v$AI_DEVOPS_VERSION"
+}
+
+cmd_paths() {
+  echo "AI_DEVOPS_HOME   = $AI_DEVOPS_HOME"
+  echo "AI_DEVOPS_ETC    = $AI_DEVOPS_ETC"
+  echo "models.env       = $MODELS_ENV"
+  echo "server.env       = $SERVER_ENV"
+  echo "log dir          = /var/log/ai-devops"
+  echo "bin (symlinked)  = /usr/local/bin/ai-*"
+}
+
+usage() {
+  cat <<EOF
+ai-devops v$AI_DEVOPS_VERSION
+
+Usage:
+  ai-devops doctor     Health-check dependencies, config, and companion tools
+  ai-devops version    Print the toolkit version
+  ai-devops paths      Print the paths this toolkit uses
+EOF
+}
+
+main() {
+  case "${1:-}" in
+    doctor)  cmd_doctor ;;
+    version) cmd_version ;;
+    paths)   cmd_paths ;;
+    ""|-h|--help|help) usage ;;
+    *) echo "Unknown subcommand: $1" >&2; echo >&2; usage >&2; exit 2 ;;
+  esac
+}
+
+main "$@"
