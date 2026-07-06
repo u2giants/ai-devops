@@ -34,6 +34,16 @@ log of user messages, assistant replies, and every tool call and result.
 | `-worksp-poppim-web` | 13 |
 | `-worksp-twenty` | 2 |
 
+### `compshop/`
+
+5 transcripts (+1 subagent), covering sessions from 2026-06-13 onward. Merged from both
+`/root/.claude/projects/` and `/home/ai/.claude/projects/` on this machine.
+
+| Project folder | Transcripts |
+|---|---:|
+| `-` | 1 |
+| `-home-ai` | 4 |
+
 ## Keeping it synced
 
 Run [`sync.sh`](./sync.sh) on the machine whose transcripts you want to back up. It copies the local
