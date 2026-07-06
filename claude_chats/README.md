@@ -66,6 +66,32 @@ Additionally, `local-agent-mode-sessions/` holds 3 Claude Desktop embedded-Code 
 (each with an `audit.jsonl` plus a nested `.claude/projects/` transcript), backed up from
 `%APPDATA%\Claude\local-agent-mode-sessions\`.
 
+### `seafile/`
+
+7 transcripts, ~10 MB. Sessions are stored **flat** in the machine folder (one `.jsonl`
+per session, without the per-working-directory subfolders the other machines use).
+
+### `t16/`
+
+Windows machine. 27 CLI sessions across 10 project folders, ~80 MB (138 `.jsonl` files
+total including subagent logs). Mirrors `C:\Users\...\.claude\projects\`.
+
+| Project folder | Transcripts |
+|---|---:|
+| `C--repos` | 1 |
+| `C--repos-ansible` | 2 |
+| `C--repos-dflow` | 11 |
+| `C--repos-oracle` | 6 |
+| `C--repos-shared-db` | 2 |
+| `C--repos-temp` | 1 |
+| `C--repos-temp-1Password-MCP` | 1 |
+| `ssh-a62e7187-6de8-4330-b235-a7d388703a6f` | 1 |
+| `ssh-ca2c3bc7-6b89-422b-bae5-e9c7ec5e1d89` | 1 |
+| `ssh-f056e7c1-b44f-419e-837c-b9cccbb73449` | 1 |
+
+Additionally, `_desktop-cowork-sessions/` holds Claude Desktop cowork-mode sessions
+(4 `.jsonl` files).
+
 ## Keeping it synced
 
 Run [`sync.sh`](./sync.sh) on the machine whose transcripts you want to back up. It copies the local
