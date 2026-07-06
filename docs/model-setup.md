@@ -1,24 +1,10 @@
 # Model Setup
 
-How model commands are configured, and how to adapt them to your machine.
-
-## Where config lives
-
-Real config: `/etc/ai-devops/models.env` (created by `install.sh` from
-`config/models.env.example`, and **never overwritten** on re-install).
-
-The example: [`config/models.env.example`](../config/models.env.example).
-
-## The variables
-
-| Variable | Stage(s) | Default |
-|----------|----------|---------|
-| `OPUS48_HIGH_REASONING_CMD` | Plan (01), Final review (07) | `claude --model opus-4.8 --reasoning high` |
-| `OPUS_REVIEW_CMD` | Plan/diff/security review (02/04/06) | `claude --model opus-4.8 --reasoning high` |
-| `GPT55_CMD` | Implement (03) | `codex exec --skip-git-repo-check` |
-| `CODEX_CMD` | `ai-codex-review` | `codex exec --skip-git-repo-check` |
-| `TESTER_CMD` | Test (05) | `codex exec --skip-git-repo-check` |
-| `AI_DEVOPS_HOME` | paths | `/worksp/ai-devops` |
+How to adapt the model **commands** to your machine. For the full list of
+`models.env` variables and where config lives, see
+[`configuration.md`](configuration.md) — that is the canonical config reference
+and is not duplicated here. This doc focuses on the model-specific concerns:
+roles, adapting CLI flags, and how the scripts use the commands.
 
 ## The model workflow (roles)
 

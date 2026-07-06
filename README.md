@@ -7,6 +7,12 @@ built around **Claude (Opus 4.8)** and **Codex / GPT-5.5**.
 This repo exists so the entire workflow can be **restored from zero** on a fresh
 Ubuntu server if the current one dies.
 
+> **New here (developer or AI session)?** Read [`AGENTS.md`](AGENTS.md) — it is
+> the canonical operating guide and documentation router. Its **Documentation
+> map** tells you which docs to load for a given task so you don't have to read
+> everything. Claude Code sessions: read [`CLAUDE.md`](CLAUDE.md) first, then
+> `AGENTS.md`.
+
 ---
 
 ## Where this lives
@@ -128,12 +134,15 @@ this repo; only the logins (gh / claude / codex) are re-done interactively.
 ## Repo layout
 
 ```
+AGENTS.md       Canonical operating guide + documentation router (read first)
+CLAUDE.md       Claude Code-specific notes (points to AGENTS.md)
 bin/            Executable CLI tools (symlinked into /usr/local/bin by install.sh)
 config/         *.env.example templates (copied to /etc/ai-devops on install)
 templates/      Prompt templates and per-repo doc add-ons
-docs/           Restore, setup, onboarding, and future-feature docs
+docs/           architecture, development, configuration, deployment, restore, +more
 skills/         Claude + Codex skill scaffolding
 mcp/            Future MCP wrapper scaffolding
+claude_chats/   Archived Claude Code session transcripts (backup; sensitive, ~219 MB)
 install.sh      Install/verify deps, config, symlinks; runs doctor
 update.sh       Pull + re-install (keeps existing config)
 uninstall.sh    Remove symlinks (keeps config/auth unless flagged)

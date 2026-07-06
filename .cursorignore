@@ -1,0 +1,29 @@
+# AI-context ignore list for Cursor.
+# Matches .claudeignore and the "What to ignore" section of AGENTS.md.
+#
+# This repo is small and text-only, so most entries below are guardrails for
+# generated/runtime dirs that may not exist yet.
+
+# Version control internals
+.git/
+
+# Archived Claude Code session transcripts (~219 MB of .jsonl).
+# Tracked in git on purpose (backup), but must NEVER be loaded into AI context:
+# huge, and may contain live secrets. See claude_chats/README.md.
+claude_chats/
+
+# Run/review artifacts (generated inside target repos, never source-of-truth)
+.ai/runs/
+.ai/tmp/
+.ai/reviews/
+
+# Real machine-local config (lives in /etc/ai-devops, never committed).
+# Only *.env.example belongs in git.
+*.env
+!*.env.example
+
+# Standard generated/vendor/build noise (do not exist here, ignore if generated)
+node_modules/
+dist/
+.cache/
+coverage/
