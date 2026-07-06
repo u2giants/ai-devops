@@ -1,0 +1,8 @@
+{
+  "id": "5",
+  "subject": "Verify both servers load",
+  "description": "Confirm both MCP servers start successfully after fix",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}
