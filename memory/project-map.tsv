@@ -1,0 +1,4 @@
+# slug -> canonical project key overrides for ai-sync-memory.
+# One "slug<TAB>project" per line. Lines starting with # are comments.
+# Only needed when the default heuristic (drop through the last "repos-") is wrong.
+C--repos-temp-1Password-MCP	1password-mcp
