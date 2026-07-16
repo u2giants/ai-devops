@@ -5,6 +5,23 @@
 # ping, hosts with a Cloudflare/public/LAN route use that route as fallback.
 # Match blocks intentionally come BEFORE Host blocks: OpenSSH uses the first
 # value obtained for a setting, so a later Match cannot override HostName.
+#
+# DO NOT add ">NUL 2>&1" (or ">/dev/null") to the ping probes below.
+# OpenSSH already sends Match-exec stdin/stdout/stderr to the null device and
+# keeps only the exit status, so a redirect suppresses NOTHING. Worse, ">NUL"
+# only means "discard" in cmd.exe: Git Bash's ssh runs Match exec through msys
+# /bin/sh, where NUL is an ordinary filename — so the redirect CREATED a junk
+# file named "NUL" in whatever directory ssh was invoked from, on every connect.
+# Removed 2026-07-16 after reproducing it; verified no output leaks without it.
+#
+# THIS FILE IS WINDOWS-ONLY TODAY — the ping flags are Windows syntax.
+# Windows: "-n 1" = one echo request, "-w 800" = 800 MILLISECOND timeout.
+# Linux:   "-n" = no reverse DNS (takes no number), "-w 800" = 800 SECOND
+#          deadline, and count is "-c". So this exact line on Ubuntu HANGS
+#          (verified on hetz 2026-07-16) instead of probing quickly, which would
+#          stall every ssh for minutes. Before installing this on any Ubuntu box,
+#          emit the Linux form instead: ping -n -c 1 -W 1 <ip>
+#          See HANDOFF.md §3c for the full finding.
 
 Host github.com
     HostName github.com
@@ -13,7 +30,7 @@ Host github.com
     IdentitiesOnly yes
 
 # Hetzner VPS / Coolify: Tailscale -> Cloudflare.
-Match host coolify,vps,hetzner !exec "ping -n 1 -w 800 100.66.37.58 >NUL 2>&1"
+Match host coolify,vps,hetzner !exec "ping -n 1 -w 800 100.66.37.58"
     HostName ssh-coolify.designflow.app
     ProxyCommand cloudflared access ssh --hostname %h
 
@@ -26,7 +43,7 @@ Host coolify vps hetzner
     ServerAliveCountMax 3
 
 # Same Hetzner host as user ai, with the Headroom tunnel.
-Match host vps2 !exec "ping -n 1 -w 800 100.66.37.58 >NUL 2>&1"
+Match host vps2 !exec "ping -n 1 -w 800 100.66.37.58"
     HostName ssh-coolify.designflow.app
     ProxyCommand cloudflared access ssh --hostname %h
 
@@ -40,7 +57,7 @@ Host vps2
     LocalForward 8787 127.0.0.1:8787
 
 # Edge Synology 1: Tailscale -> local LAN.
-Match host edgesynology1,edge1 !exec "ping -n 1 -w 800 100.107.131.35 >NUL 2>&1"
+Match host edgesynology1,edge1 !exec "ping -n 1 -w 800 100.107.131.35"
     HostName 192.168.3.100
 
 Host edgesynology1 edge1
@@ -51,7 +68,7 @@ Host edgesynology1 edge1
     Port 22
 
 # Edge Synology 2: Tailscale -> local LAN; admin SSH uses port 1904.
-Match host edgesynology2,edge2 !exec "ping -n 1 -w 800 100.107.131.36 >NUL 2>&1"
+Match host edgesynology2,edge2 !exec "ping -n 1 -w 800 100.107.131.36"
     HostName 192.168.3.101
 
 Host edgesynology2 edge2
@@ -62,7 +79,7 @@ Host edgesynology2 edge2
     Port 1904
 
 # BackupWiz / Restore Wizard: Tailscale -> Cloudflare.
-Match host backupwiz,wiz !exec "ping -n 1 -w 800 100.94.183.1 >NUL 2>&1"
+Match host backupwiz,wiz !exec "ping -n 1 -w 800 100.94.183.1"
     HostName ssh-backupwiz.designflow.app
     ProxyCommand cloudflared access ssh --hostname %h
 
@@ -82,7 +99,7 @@ Host vpn amnezia
     IdentitiesOnly yes
 
 # CompShop Hostdare VPS: Tailscale -> Cloudflare.
-Match host comp,hostdare !exec "ping -n 1 -w 800 100.127.128.110 >NUL 2>&1"
+Match host comp,hostdare !exec "ping -n 1 -w 800 100.127.128.110"
     HostName ssh-comp.designflow.app
     ProxyCommand cloudflared access ssh --hostname %h
 
@@ -95,7 +112,7 @@ Host comp hostdare
     ServerAliveCountMax 120
 
 # Linode Seafile Pro: Tailscale -> Cloudflare.
-Match host seafile !exec "ping -n 1 -w 800 100.92.1.120 >NUL 2>&1"
+Match host seafile !exec "ping -n 1 -w 800 100.92.1.120"
     HostName ssh-seafile.designflow.app
     ProxyCommand cloudflared access ssh --hostname %h
 
@@ -117,7 +134,7 @@ Host 100.92.1.120
     ServerAliveCountMax 120
 
 # Authentik: Tailscale port 22 -> public IP port 1904.
-Match host auth,authentik !exec "ping -n 1 -w 800 100.85.108.94 >NUL 2>&1"
+Match host auth,authentik !exec "ping -n 1 -w 800 100.85.108.94"
     HostName 47.110.86.216
     Port 1904
 
