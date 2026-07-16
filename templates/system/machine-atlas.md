@@ -71,6 +71,53 @@ changes; convert to that machine's reality, don't guess.
   `C:\Dropbox\vibe coding\set up synology and VPS MCP servers…`) — never
   hand-edit configs, never let Claude scripts touch Codex config
   (`C:\Users\ahazan2\.codex\config.toml`).
+
+### Codex on Windows — the junction trap (2026-07-16)
+
+**`codex exec` can look completely healthy and silently write nothing.** Do not
+trust `codex --version` / `codex login status` as proof Codex works.
+
+- The standalone installer puts `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin` on
+  PATH. **That directory is a junction** to
+  `%USERPROFILE%\.codex\packages\standalone\current\bin` — only `bin` is linked,
+  so the package's sibling `codex-resources\` is invisible from it. Codex resolves
+  its sandbox helper next to the invoked exe / under `..\codex-resources\`, so via
+  that PATH entry it cannot launch `codex-windows-sandbox-setup.exe` and **every**
+  sandboxed write fails with `program not found` — while `--version` and
+  `login status` still exit 0.
+- **Verified A/B (same binary, same version 0.144.5, same flags):** fails via
+  `…\Programs\OpenAI\Codex\bin\codex.exe`; succeeds via
+  `…\.codex\packages\standalone\current\bin\codex.exe`.
+- **Fix (applied by `bin/setup-machine.ps1`, step "Codex PATH"):** put
+  `%USERPROFILE%\.codex\packages\standalone\current\bin` **first** on the user
+  PATH. `current` is a junction the updater re-points, so this survives upgrades —
+  unlike copying the helpers into the shim's `bin`, which must be redone every
+  upgrade.
+- **This is an upstream bug**, not a bad install: the package is complete and
+  passes the installer's own completeness check. Tracked at
+  [openai/codex#32655](https://github.com/openai/codex/issues/32655) (we confirmed
+  0.144.5 there); see also #30829, #32359, #28457.
+- **Prove it, don't assume it:** `ai-devops doctor` now runs a real
+  `--sandbox workspace-write` write and fails loudly if it cannot. Run that after
+  any Codex install/upgrade.
+- `find` will NOT show you files through the junction (`-type f` returns nothing);
+  that is a junction, not an empty dir. Use PowerShell
+  `Get-Item <dir> | Select LinkType,Target` to see what it really points at.
+
+### `bash` on these machines is WSL — injected env does not cross
+
+- A bare `bash` on Windows resolves to **WSL** bash (a child `pwd` returns
+  `/mnt/c/...`), and WSL starts an isolated Linux environment that does **not**
+  inherit the Windows process env. Anything injecting env vars into a child
+  (e.g. the 1Password MCP `op_run` tool) will appear "broken": the vars are set on
+  the Windows process and WSL discards them.
+- Use native children instead — cmd (`%VAR%`), PowerShell (`$env:VAR`), or `node`
+  (`process.env.VAR`). The Claude Code **Bash tool** is Git Bash (MSYS2), which
+  *does* inherit Windows env — a different `bash` than the one `argv:["bash",…]`
+  reaches. Don't conflate them.
+- **Debugging rule this cost a session to learn:** an empty result is not proof a
+  tool is broken. Establish platform, resolved executable, shell, cwd and env
+  boundary *before* blaming the tool. One `pwd` would have shown `/mnt/c/...`.
 - Remote MCPs: devops-mcp `https://mcp.designflow.app/mcp` (VPS root access),
   synology-monitor `https://nas-mcp.designflow.app/sse` (NAS); AG-Grid MCP for
   dflow docs.
