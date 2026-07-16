@@ -1,78 +1,48 @@
-# ==========================================================================
-# Managed SSH config (ai-devops) — host aliases for Albert's servers.
-# --------------------------------------------------------------------------
-# NON-SECRET (hostnames + the PUBLIC identity file path only). Safe to commit
-# to this PRIVATE repo. Installed to ~/.ssh/config by the machine setup so
-# `ssh vps` etc. work immediately on a new machine.
+# Managed SSH config (ai-devops) — authoritative host aliases for Albert.
+# Windows setup installs this as ~/.ssh/ai-devops.conf and Includes it first.
 #
-# Connectivity choice: hosts that have a Cloudflare tunnel use it as the PRIMARY
-# path (ProxyCommand cloudflared). That path works on ANY network and IDENTICALLY
-# on Windows and Linux, with no Tailscale required — the turnkey option for a new
-# machine. (Power users who want the faster Tailscale mesh can switch a host's
-# HostName to its 100.x Tailscale IP; those are noted per host.)
-#
-# All hosts authenticate with the 916-alien key, restored from 1Password by the
-# setup script to ~/.ssh/916-alien. Requires: cloudflared installed (the setup
-# script installs it).
-# ==========================================================================
+# Route policy: Tailscale is primary. When a Tailscale address does not answer
+# ping, hosts with a Cloudflare/public/LAN route use that route as fallback.
+# Match blocks intentionally come BEFORE Host blocks: OpenSSH uses the first
+# value obtained for a setting, so a later Match cannot override HostName.
 
-# GitHub — keeps its own separate key (git over SSH). Most git here uses HTTPS +
-# the GitHub PAT, so this is only needed if you use SSH remotes.
 Host github.com
     HostName github.com
     User git
     IdentityFile ~/.ssh/id_ed25519
     IdentitiesOnly yes
 
-# Hetzner VPS / Coolify — the production server.
-#   ssh vps   ssh vps2   ssh coolify   ssh hetzner
-# (vps2 is an alias for the same box.) Tailscale IP: 100.66.37.58
-Host vps vps2 coolify hetzner
-    User root
+# Hetzner VPS / Coolify: Tailscale -> Cloudflare.
+Match host coolify,vps,hetzner !exec "ping -n 1 -w 800 100.66.37.58 >NUL 2>&1"
     HostName ssh-coolify.designflow.app
     ProxyCommand cloudflared access ssh --hostname %h
+
+Host coolify vps hetzner
+    User root
+    HostName 100.66.37.58
     IdentityFile ~/.ssh/916-alien
     IdentitiesOnly yes
     ServerAliveInterval 30
     ServerAliveCountMax 3
 
-# backupwiz — DigitalOcean droplet.  ssh backupwiz | ssh wiz
-# Tailscale IP: 100.94.183.1
-Host backupwiz wiz
-    User root
-    HostName ssh-backupwiz.designflow.app
+# Same Hetzner host as user ai, with the Headroom tunnel.
+Match host vps2 !exec "ping -n 1 -w 800 100.66.37.58 >NUL 2>&1"
+    HostName ssh-coolify.designflow.app
     ProxyCommand cloudflared access ssh --hostname %h
-    IdentityFile ~/.ssh/916-alien
-    IdentitiesOnly yes
-    ServerAliveInterval 60
-    ServerAliveCountMax 120
 
-# Seafile — Linode Seafile Pro server.  ssh seafile
-# Tailscale IP: 100.92.1.120
-Host seafile
+Host vps2
     User ai
-    HostName ssh-seafile.designflow.app
-    ProxyCommand cloudflared access ssh --hostname %h
+    HostName 100.66.37.58
     IdentityFile ~/.ssh/916-alien
     IdentitiesOnly yes
-    ServerAliveInterval 60
-    ServerAliveCountMax 120
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+    LocalForward 8787 127.0.0.1:8787
 
-# CompShop — Hostdare VPS.  ssh comp | ssh hostdare
-# Tailscale IP: 100.127.128.110
-Host comp hostdare
-    User root
-    HostName ssh-comp.designflow.app
-    ProxyCommand cloudflared access ssh --hostname %h
-    IdentityFile ~/.ssh/916-alien
-    IdentitiesOnly yes
-    ServerAliveInterval 60
-    ServerAliveCountMax 120
+# Edge Synology 1: Tailscale -> local LAN.
+Match host edgesynology1,edge1 !exec "ping -n 1 -w 800 100.107.131.35 >NUL 2>&1"
+    HostName 192.168.3.100
 
-# --- Hosts WITHOUT a Cloudflare tunnel (need Tailscale, or use the public IP) ---
-
-# edgesynology1 — Synology NAS.  ssh edge1 | ssh edgesynology1
-# Needs Tailscale (or LAN 192.168.3.100). Shown with its Tailscale IP.
 Host edgesynology1 edge1
     User ahazan
     HostName 100.107.131.35
@@ -80,7 +50,10 @@ Host edgesynology1 edge1
     IdentitiesOnly yes
     Port 22
 
-# edgesynology2 — Synology NAS (admin SSH on port 1904).  ssh edge2 | ssh edgesynology2
+# Edge Synology 2: Tailscale -> local LAN; admin SSH uses port 1904.
+Match host edgesynology2,edge2 !exec "ping -n 1 -w 800 100.107.131.36 >NUL 2>&1"
+    HostName 192.168.3.101
+
 Host edgesynology2 edge2
     User ahazan
     HostName 100.107.131.36
@@ -88,20 +61,71 @@ Host edgesynology2 edge2
     IdentitiesOnly yes
     Port 1904
 
-# Authentik server.  ssh auth | ssh authentik
-# Tailscale 100.85.108.94:22, or public 47.110.86.216:1904.
-Host auth authentik
+# BackupWiz / Restore Wizard: Tailscale -> Cloudflare.
+Match host backupwiz,wiz !exec "ping -n 1 -w 800 100.94.183.1 >NUL 2>&1"
+    HostName ssh-backupwiz.designflow.app
+    ProxyCommand cloudflared access ssh --hostname %h
+
+Host backupwiz wiz
     User root
-    HostName 100.85.108.94
+    HostName 100.94.183.1
     IdentityFile ~/.ssh/916-alien
     IdentitiesOnly yes
-    Port 22
     ServerAliveInterval 60
     ServerAliveCountMax 120
 
-# AmneziaWG VPN server (public IP).  ssh vpn | ssh amnezia
+# AmneziaWG VPN server (public IP only).
 Host vpn amnezia
     HostName 185.201.227.239
     User root
     IdentityFile ~/.ssh/916-alien
     IdentitiesOnly yes
+
+# CompShop Hostdare VPS: Tailscale -> Cloudflare.
+Match host comp,hostdare !exec "ping -n 1 -w 800 100.127.128.110 >NUL 2>&1"
+    HostName ssh-comp.designflow.app
+    ProxyCommand cloudflared access ssh --hostname %h
+
+Host comp hostdare
+    User root
+    HostName 100.127.128.110
+    IdentityFile ~/.ssh/916-alien
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 120
+
+# Linode Seafile Pro: Tailscale -> Cloudflare.
+Match host seafile !exec "ping -n 1 -w 800 100.92.1.120 >NUL 2>&1"
+    HostName ssh-seafile.designflow.app
+    ProxyCommand cloudflared access ssh --hostname %h
+
+Host seafile
+    User ai
+    HostName 100.92.1.120
+    IdentityFile ~/.ssh/916-alien
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 120
+
+# Raw Seafile Tailscale address uses the correct user and key too.
+Host 100.92.1.120
+    User ai
+    HostName 100.92.1.120
+    IdentityFile ~/.ssh/916-alien
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 120
+
+# Authentik: Tailscale port 22 -> public IP port 1904.
+Match host auth,authentik !exec "ping -n 1 -w 800 100.85.108.94 >NUL 2>&1"
+    HostName 47.110.86.216
+    Port 1904
+
+Host auth authentik
+    HostName 100.85.108.94
+    User root
+    IdentityFile ~/.ssh/916-alien
+    IdentitiesOnly yes
+    Port 22
+    ServerAliveInterval 60
+    ServerAliveCountMax 120
