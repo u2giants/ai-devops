@@ -6,3 +6,4 @@
 - [git fetch before claiming "not merged"](git-fetch-before-claiming-not-merged.md) — I blocked a task on a stale local `main`; the fix was already on `origin/main`.
 - [Kimi Code CLI for a local K3 second opinion](kimi-code-cli-local-second-opinion.md) — `~/.kimi-code/bin/kimi -m kimi-code/k3 -p`; reaches real K3, which the OpenRouter key cannot.
 - [OpenRouter Oracle key has embedded quotes](openrouter-oracle-key-has-embedded-quotes.md) — the 1Password value is wrapped in literal `"`, causing 401 "Missing Authentication header"; strip before use.
+- [Write tool mangles literal control chars](write-tool-mangles-literal-control-chars.md) — build CR/ESC/bidi chars with String.fromCharCode in source and tests; literal control bytes don't survive Write/Edit content.
