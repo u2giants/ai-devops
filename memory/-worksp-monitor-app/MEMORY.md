@@ -4,3 +4,4 @@
 - [Verify MCP availability via claude mcp list](verify-mcp-availability-via-claude-mcp-list.md) — a negative ToolSearch is not proof a server is unconnected; I once told the user a capability was missing when it wasn't.
 - [The NAS MCP is named synology-monitor](nas-mcp-is-named-synology-monitor.md) — server naming, the stale token, and why worktree sessions never load it.
 - [git fetch before claiming "not merged"](git-fetch-before-claiming-not-merged.md) — I blocked a task on a stale local `main`; the fix was already on `origin/main`.
+- [Kimi Code CLI for a local K3 second opinion](kimi-code-cli-local-second-opinion.md) — `~/.kimi-code/bin/kimi -m kimi-code/k3 -p`; reaches real K3, which the OpenRouter key cannot.
