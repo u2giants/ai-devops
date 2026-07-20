@@ -46,7 +46,9 @@ changes; convert to that machine's reality, don't guess.
   `@eaDir #recycle #snapshot @tmp`.
 - ShareSync unstick procedure (the ONLY thing that works — restarts don't):
   move the stuck file out of its folder, rename it, wait for sync, move back.
-  See the `synology-sharesync-stuck-triage` skill.
+  See the `synology-sharesync-triage` skill for evidence-first diagnosis and
+  targeted queue repair; retain move-rename-move-back as the safe file-level
+  unstick before database surgery.
 - File-archive jobs on NAS shares must NEVER change file dates
   (created/modified) — hard requirement.
 - Bridge-agent containers at `/volume1/docker/popdam` on the NAS; Watchtower
