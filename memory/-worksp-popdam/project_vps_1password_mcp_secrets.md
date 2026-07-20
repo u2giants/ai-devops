@@ -7,7 +7,7 @@ metadata:
   originSessionId: 18f5033f-df76-4d6c-a271-171812318866
 ---
 
-This Claude Code runs ON the Hetzner VPS (`hetz`) that hosts the Coolify stack (frontend, the two MCP servers, popcrm/poppim/directus, etc.). I have docker access via passwordless `sudo`.
+This Claude Code runs ON the Hetzner VPS (`hetz`) that hosts the Coolify stack (frontends, workers, and the two MCP servers). I have docker access via passwordless `sudo`.
 
 **Secrets live in 1Password vault `vibe_coding`** (id b2dsir4jze3wfygdxixoaasdeq). A 1Password **service account** token is at `/root/.bashrc` as `OP_SERVICE_ACCOUNT_TOKEN` — it is **scoped to `vibe_coding` ONLY** (read+write), so `op` CLI on the VPS cannot see other vaults. Load it in a fresh shell with:
 `export OP_SERVICE_ACCOUNT_TOKEN="$(sudo grep -m1 OP_SERVICE_ACCOUNT_TOKEN /root/.bashrc | sed -E 's/^[^=]*=//; s/^["'\'']//; s/["'\'']$//')"`. There is **no 1Password MCP** connected to the session (user is forking one; it needs write ops: create-with-notes, edit fields, **edit notesPlain after creation** — `op` CLI does all these). The user prefers the MCP over `op` CLI when available, but the SA is already least-privilege.
