@@ -5,6 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 02913776-8d59-48dc-ac7f-cfb46f678c1f
+  modified: 2026-07-20T21:07:12.274Z
 ---
 
 On synology-monitor, "the code looks correct" has repeatedly hidden tools that are
@@ -26,6 +27,16 @@ On synology-monitor, "the code looks correct" has repeatedly hidden tools that a
 **Why:** the tier gates, `write: true`, "enabled", and a passing type-check check none
 of: binary present, mount writable/accessible, identifiers resolvable in the container,
 command not hard-blocked. Only a real run does.
+
+**The repo's compose file is NOT the live config.** 2026-07-17 I concluded
+`hdparm_device_info` could never work and disabled it, because
+`deploy/synology/docker-compose.agent.yml` grants only `SYS_ADMIN`/`SYS_PTRACE`. Wrong —
+the file is drifted; the live NASes already grant `SYS_RAWIO` (privilege hardening), which
+is exactly what makes `hdparm -I` work. Caught only by
+`docker inspect -f '{{.HostConfig.CapAdd}}' synology-monitor-nas-api` on the box. A stale
+worktree branch (7 commits behind `main`) made it worse. Read live capability/mount/device
+state from the running container, never from the repo YAML — and `git fetch` before
+reasoning about any repo file. Related: [[git-fetch-before-claiming-not-merged]].
 
 **How to apply:** before trusting any NAS tool or compose change, run it — via the
 `synology-monitor` MCP (`check_smart_detail`, `strace_process`, etc.), a Go test against
