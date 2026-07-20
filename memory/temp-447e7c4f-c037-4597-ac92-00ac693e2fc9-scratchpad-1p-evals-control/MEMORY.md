@@ -1,0 +1,1 @@
+- [hetz `ai` user SSH key passphrase](hetz-ai-ssh-key-passphrase.md) — passphrase lives in 1Password vault `vibe_coding`; box is the Hetzner VPS, aliases `vps`/`coolify`

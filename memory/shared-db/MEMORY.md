@@ -1,0 +1,1 @@
+- [op_run MCP WSL env trap](op-run-mcp-wsl-env-trap.md) — op_run works fully (env + op:// + redaction); trap is argv `bash`=WSL which drops injected env. Use cmd `%VAR%` / PowerShell `$env:VAR` / node, not WSL bash
