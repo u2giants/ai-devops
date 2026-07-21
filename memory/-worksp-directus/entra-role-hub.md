@@ -9,7 +9,7 @@ metadata:
 
 POP Creations centralizes user roles in **Microsoft Entra ID security groups** so a person's role is defined once and read by every app (PM, CRM, DAM). Decided 2026-06-10.
 
-**Model B (single writer):** roles are edited in **Directus** (the PM app, https://[retired-hostname-removed]); Directus mirrors them **outbound to Entra** hourly. Other apps (CRM = forked Twenty; DAM = popdam) are **read-only consumers** of the Entra groups. Only promote a second app to writer deliberately — multi-writer sync loops are the failure mode Albert explicitly wanted avoided.
+**Model B (single writer):** roles are edited in **Directus** (the PM app, https://data.designflow.app); Directus mirrors them **outbound to Entra** hourly. Other apps (CRM = forked Twenty; DAM = popdam) are **read-only consumers** of the Entra groups. Only promote a second app to writer deliberately — multi-writer sync loops are the failure mode Albert explicitly wanted avoided.
 
 - Six Entra security groups named `POP PIM · <Role>` (Administrator/Sales/Licensing/Designer/Viewer/Vendor) mirror the six Directus roles.
 - Write credential = a dedicated Entra app **`POP PIM — Graph Role Sync`** (appId `a645fc70-fea9-4703-871c-900b97f898d7`, perms `GroupMember.ReadWrite.All` + `User.Read.All`). Secret lives ONLY in `/home/ai/.directus-deploy.env` (mode 600), never in the repo or the public Directus container.

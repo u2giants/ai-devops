@@ -9,7 +9,7 @@ metadata:
 
 Directus 11.17 uses **policies**, not direct role permissions. Each role links to one or more policies; permissions belong to policies. The **Public** policy (`role: null` on permission rows) only applies to *unauthenticated* requests — logged-in users do NOT inherit it. So a role with an app policy that has zero permission rows = its users see nothing (this was the original Jessica/Designer bug, fixed 2026-06-16).
 
-Current app roles ([retired-hostname-removed]): Administrator (admin_access), plus non-admin app roles **Designer, Vendor, Sales, Licensing, Viewer**. Admin users: svc@popcre.com, albert@popcre.com. Jessica Cortazar (jcortazar@popcre.com) and Adam Dweck (adweck@popcre.com) are Designers.
+Current app roles (data.designflow.app): Administrator (admin_access), plus non-admin app roles **Designer, Vendor, Sales, Licensing, Viewer**. Admin users: svc@popcre.com, albert@popcre.com. Jessica Cortazar (jcortazar@popcre.com) and Adam Dweck (adweck@popcre.com) are Designers.
 
 **"All Access (temp)" policy** (id `54009e87-44e1-416f-8f5b-cfdc324eb701`) is attached to all 5 non-admin roles. It grants full CRUD on all 37 business collections + directus_files (CRUD), directus_users/roles (read), presets/comments/notifications/shares (CRUD). 178 permission rows. This is intentional blanket access during setup — gating comes later.
 
