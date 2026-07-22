@@ -20,3 +20,5 @@
 - [Project: secret/DB access paths](project_secret_access_paths.md) — when supabase MCP is unauthorized: op no-print path (op run --env-file), service role via PostgREST, psql/CLI; OpenRouter key in admin_config; account data-policy gotcha
 - [Project: AI model routing](project_ai_routing.md) — OpenRouter+Exacto-by-default; live models in admin_config.AI_TASK_MODELS (qwen/minimax/deepseek, no Gemini); TRAP: GOOGLE_AI_API_KEY still live for on-prem agent PDF text extraction — not dead
 - [Feedback: cacheable batch → direct API not OpenRouter](feedback_caching_direct_api.md) — repeated-prompt-prefix high-volume LLM work uses direct provider (DeepSeek auto prompt caching ~1/10 price); stable-prefix-first; never OpenRouter for that
+- [Project: PopSG vs PopDAM search paths](project_popsg_search_paths.md) — PopSG library search is a SEPARATE path (style_guide_file_groups raw ILIKE in PopSGLibraryPage), not the dam_search_documents RPCs; check the network tab before fixing
+- [Project: PopSG AI tester login](project_popsg_tester_login.md) — ai-tester@popcre.com in 1Password (vibe_coding); invitation-gated signup; how to create/inject-session/teardown
