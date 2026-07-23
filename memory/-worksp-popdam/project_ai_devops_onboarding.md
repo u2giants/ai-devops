@@ -15,7 +15,7 @@ Shipped 2026-07-14 (commit "Add unified new-machine secrets & onboarding").
 - One source of truth = 1Password vault `vibe_coding`, referenced via `op://`
   only, never values. Central refs file: `config/mcp.env.example` → installed to
   `~/.config/ai-devops/mcp.env`. One shared Supabase PAT item for ALL apps
-  (`op://vibe_coding/Supabase CLI Personal Access Token/SUPABASE_ACCESS_TOKEN`); MCP
+  (`op://vibe_coding/ujkouj7hatka2xyfbgvzyu4344/SUPABASE_ACCESS_TOKEN`); MCP
   tokens `op://vibe_coding/designflow-mcp/{devops_token,nas_token}`.
 - Ubuntu (`bin/setup-secrets.sh`): shell-EXPORT model (resolves refs into the
   login shell) — chosen over an `op run` wrapper because it's what already works
