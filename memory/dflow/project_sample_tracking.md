@@ -5,6 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: b7424fcb-c3bf-4d5b-a132-c1247ee072c2
+  modified: 2026-07-23T01:23:49.595Z
 ---
 
 Sample tracking lets the team track physical samples through a bidirectional pipeline:
@@ -31,6 +32,24 @@ photos/comments/timeline + box/group dialog), config `helpers/ag-grid/sample.tra
 `develop`). 66 backend jest tests + frontend specs pass, `ng build` clean. PRs open:
 designflow-tracking#17 (created), designflow-frontend#104 (existing, updated). Status moves are
 derived server-side with an optimistic-concurrency 409 guard.
+
+**Quantity/movement redesign (2026-07-22):** shared-db plan `fix_sample_tracking_schema.md`
+(one sample row = a batch; immutable positive movements between normalized typed locations are the
+sole quantity authority; conservation 4→4→3→1). Schema landed in `u2giants/shared-db` on `main`
+(PR #168, merge `5d20dad`): tables `dflow.sample_movement` (+ BEFORE-INSERT balance-guard trigger
+using `pg_advisory_xact_lock(21450,sample_id)`, immutability trigger, `post_sample_movement()`
+idempotent RPC), `sample_shipment_line`, `sample_stop_closeout`, `sample_import_job/_row`, box
+`owner_factory_id_fk`+`ownership_state`, `sample.quantity_migration_state`, and read views
+(`sample_balance_by_location` etc.). Migrations `20260722221000`–`221600`. Behaviorally proven on
+preview (conservation, over-allocation reject, idempotency) inside a rolled-back tx.
+
+**CRITICAL landmine fixed:** the block originally used timestamp `20260722220000`, COLLIDING with
+the PopSG trigram-index migration. Supabase keys its ledger on the timestamp alone, so production
+recorded 220000 as the PopSG migration and SILENTLY SKIPPED the `sample_shipment_item` restore —
+so on production `dflow.sample_shipment_item` still does NOT exist and the whole quantity schema
+never applied. Fix = re-timestamp to 221000+. **Production was NOT promoted** (needs approved
+window); preview has it. Next: production promotion, then the tracking API layer wrapping
+`post_sample_movement` (receipts/repack/imports/dashboard), then the web UI (planned for Kimi).
 
 **Photo upload:** DigitalOcean Spaces (`dflowbucket` on sfo3) is wired in tracking
 `cloudbuild.yaml` — `DO_ACCESS_KEY`/`DO_SECRET_KEY` via Secret Manager (`deployer@` SA has
