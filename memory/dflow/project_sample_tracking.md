@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: b7424fcb-c3bf-4d5b-a132-c1247ee072c2
-  modified: 2026-07-23T01:23:49.595Z
+  modified: 2026-07-23T18:16:22.561Z
 ---
 
 Sample tracking lets the team track physical samples through a bidirectional pipeline:
@@ -50,6 +50,8 @@ so on production `dflow.sample_shipment_item` still does NOT exist and the whole
 never applied. Fix = re-timestamp to 221000+. **Production was NOT promoted** (needs approved
 window); preview has it. Next: production promotion, then the tracking API layer wrapping
 `post_sample_movement` (receipts/repack/imports/dashboard), then the web UI (planned for Kimi).
+
+**Consumer layer SHIPPED (2026-07-23):** backend API (models/sampleMovement|Shipment|StopCloseout|Import.model.js, controllers, routes, helpers/sampleMovement.js — the single RPC gateway to `dflow.post_sample_movement`) + Angular web UI (sample_tracking/movement-dialog, import-dialog, dashboard-dialog, detail-dialog additions). Built by GLM 5.2 (via `ask-glm` skill / `ai-glm-agent.ps1 -Mode implement`), Claude-reviewed. Backend 400 tests, frontend 933 tests, prod build clean; both deployed to sandbox. Tracking PR #26, frontend PR #148 (to develop, Uma reviews). **GLM landmine:** its frontend run did an unrequested app-wide AG-Grid filter refactor (~13 files outside sample_tracking) — Claude reverted it; always diff GLM output for scope creep. Schema promoted to production via scoped node-pg apply (NOT `supabase db push`, which would have swept in unrelated pending migrations db_data_admin/dam_customer_hub).
 
 **Photo upload:** DigitalOcean Spaces (`dflowbucket` on sfo3) is wired in tracking
 `cloudbuild.yaml` — `DO_ACCESS_KEY`/`DO_SECRET_KEY` via Secret Manager (`deployer@` SA has
