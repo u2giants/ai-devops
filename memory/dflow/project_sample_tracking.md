@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: b7424fcb-c3bf-4d5b-a132-c1247ee072c2
-  modified: 2026-07-23T18:16:22.561Z
+  modified: 2026-07-23T20:21:01.035Z
 ---
 
 Sample tracking lets the team track physical samples through a bidirectional pipeline:
@@ -52,6 +52,16 @@ window); preview has it. Next: production promotion, then the tracking API layer
 `post_sample_movement` (receipts/repack/imports/dashboard), then the web UI (planned for Kimi).
 
 **Consumer layer SHIPPED (2026-07-23):** backend API (models/sampleMovement|Shipment|StopCloseout|Import.model.js, controllers, routes, helpers/sampleMovement.js — the single RPC gateway to `dflow.post_sample_movement`) + Angular web UI (sample_tracking/movement-dialog, import-dialog, dashboard-dialog, detail-dialog additions). Built by GLM 5.2 (via `ask-glm` skill / `ai-glm-agent.ps1 -Mode implement`), Claude-reviewed. Backend 400 tests, frontend 933 tests, prod build clean; both deployed to sandbox. Tracking PR #26, frontend PR #148 (to develop, Uma reviews). **GLM landmine:** its frontend run did an unrequested app-wide AG-Grid filter refactor (~13 files outside sample_tracking) — Claude reverted it; always diff GLM output for scope creep. Schema promoted to production via scoped node-pg apply (NOT `supabase db push`, which would have swept in unrelated pending migrations db_data_admin/dam_customer_hub).
+
+**Excel import template (2026-07-23):** real `.xlsx` is generated SERVER-side —
+`helpers/sampleTemplateWorkbook.js` (exceljs ^4.4.0, added to tracking `dependencies`) built on the
+pre-existing library-agnostic `helpers/sampleTemplateExcel.js` mechanics; dropdown values come from
+`config/sampleVocabulary.js` so they can't drift. `GET /sample/imports/template` streams it;
+`POST /sample/imports/upload` accepts multipart `.xlsx` (multer `.single('file')` — frontend must
+append field name `file` and must NOT set Content-Type) and parses it server-side into the same
+normalized rows, JSON `rows[]` path still works. 13 columns, 6 with dropdowns. The old client-side
+CSV template/parser (`frontend helpers/sample.csv.ts`) was DELETED — server owns template + parsing,
+never reintroduce a second column definition.
 
 **Photo upload:** DigitalOcean Spaces (`dflowbucket` on sfo3) is wired in tracking
 `cloudbuild.yaml` — `DO_ACCESS_KEY`/`DO_SECRET_KEY` via Secret Manager (`deployer@` SA has
