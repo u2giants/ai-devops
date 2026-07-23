@@ -13,13 +13,13 @@ via `op run --env-file`. Two traps bit here (fixed 2026-07-22, commit on
 u2giants/ai-devops main):
 
 1. **The key is NOT in the item's built-in `credential` field.** 1Password item
-   "GLM z.ai API" (vibe_coding, id `jjgy3uyww3creybrcz4w6lrfm4`) stores the real
+   "GLM z.ai API" (vibe_coding, id `lc35ogs6lrvtjfsosathibgcwm`) stores the real
    Z.ai key in a custom field labelled **"api key"** (field id
    `vup42ni2phmssxqfkdfadxx22i`). The `credential` field is EMPTY. `op read`/`op run`
    of an empty field return `""` with exit 0 — a silent empty. Same class of trap
    as [[op-service-account-token-field]]. Correct ref (item id + field id, both
    space-free so `op run --env-file` parses it):
-   `op://vibe_coding/jjgy3uyww3creybrcz4w6lrfm4/vup42ni2phmssxqfkdfadxx22i`.
+   `op://vibe_coding/lc35ogs6lrvtjfsosathibgcwm/vup42ni2phmssxqfkdfadxx22i`.
 
 2. **Empty key → fork bomb.** The launcher re-execs itself under `op run` whenever
    `ZAI_API_KEY` is empty. With the key permanently empty the re-exec looped without
