@@ -66,6 +66,19 @@ changes; convert to that machine's reality, don't guess.
   shared-db, ansible (t16), synology-monitor, popdam3 checkout, 1Password-MCP
   fork (`@u2giants/1password-mcp`, main-only, Trusted Publishing via tag push;
   version bumps go in package.json + server.json ×2 + src/config.ts).
+- **4837 home-drive trap (fixed 2026-07-24):** on 4837 the *interactive* logon
+  maps the home drive to `Z:` (roaming profile — `HOMEDRIVE=Z:`), so Git Bash
+  derived `$HOME=Z:\` and any `$HOME`-based install (e.g. `ai-install-skills`)
+  wrote to `Z:\.claude`, `Z:\.config`, `Z:\.ssh` — where Claude Code / Codex
+  never read (they use `%USERPROFILE%`=`C:\Users\ahazan2`). SSH/service logons
+  are unaffected (they see `C:`). Fixed two ways: (1) pinned a User env var
+  `HOME=C:\Users\ahazan2` on 4837; (2) `bin/ai-install-skills` now targets
+  `%USERPROFILE%` when set instead of `$HOME`. The `Z:\.claude|.config|.ssh`
+  folders left behind are stray and safe to delete (check `.ssh` for a real key
+  first). t16/916 were not affected (their `$HOME` is already `C:`).
+- SSH between dev machines: 4837 is reachable over Tailscale via the `4837`
+  host alias (`100.123.87.44`, user `ahazan2`, key `916-alien`) in
+  `config/ssh-config.template`; it already trusts `916-alien.pub`.
 - Claude Desktop is the Store/MSIX install — config is at
   `C:\Users\ahazan2\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`,
   NOT `%APPDATA%\Claude`. MCP servers are added via the two Dropbox scripts
