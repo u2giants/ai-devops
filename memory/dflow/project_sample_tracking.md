@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: b7424fcb-c3bf-4d5b-a132-c1247ee072c2
-  modified: 2026-07-23T20:21:01.035Z
+  modified: 2026-07-24T12:33:59.923Z
 ---
 
 Sample tracking lets the team track physical samples through a bidirectional pipeline:
@@ -62,6 +62,24 @@ append field name `file` and must NOT set Content-Type) and parses it server-sid
 normalized rows, JSON `rows[]` path still works. 13 columns, 6 with dropdowns. The old client-side
 CSV template/parser (`frontend helpers/sample.csv.ts`) was DELETED — server owns template + parsing,
 never reintroduce a second column definition.
+
+**Routes = 8 explicit From→To (2026-07-24, Albert-approved):** factory_to_ningbo, factory_to_nyc,
+factory_to_customer, ningbo_to_nyc, ningbo_to_customer, nyc_to_ningbo, nyc_to_factory, nyc_to_customer.
+NO relative direction, NO generic 'return'/'direct_to_customer'. nyc_to_ningbo & nyc_to_factory are
+NOT returns — they carry USA-bought (US-store) reference samples forward. Enforced by
+`dflow.sample_shipment_line.route_leg` CHECK (shared-db PR #210, migration 20260724040000, on
+preview+prod). Mirrored in backend `config/sampleVocabulary.js` ROUTE_LEGS and frontend
+`sample_tracking/helpers/sample.vocabulary.ts` — keep all three in sync. (Note: 'return' is still a
+valid movement lifecycle_action, distinct from the removed route.)
+
+**Import template convention: reuse the RFQ pattern.** `designflow-backend/helpers/rfqBulkImport.js`
+is the reference for factory Excel templates (human labels, Customer dropdown from customers table via
+hidden `Lookups` sheet + range ref, image column, styled/frozen). The sample template
+(`tracking/helpers/sampleTemplateWorkbook.js`) now follows it: Image col FIRST, no Direction/Office
+columns (derived/optional), dropdowns show `.label` not raw value (parser maps label→value), Customer
+dropdown from `SELECT customers_id,customers_name FROM customers WHERE customers_status='ACTIVE'`.
+Two separate services so no shared package — re-implement, don't cross-require. GLM landmine seen twice:
+it does unrequested app-wide changes — always diff its output for scope creep before shipping.
 
 **Photo upload:** DigitalOcean Spaces (`dflowbucket` on sfo3) is wired in tracking
 `cloudbuild.yaml` — `DO_ACCESS_KEY`/`DO_SECRET_KEY` via Secret Manager (`deployer@` SA has
