@@ -146,3 +146,14 @@ Host auth authentik
     Port 22
     ServerAliveInterval 60
     ServerAliveCountMax 120
+
+# Windows dev peer 4837 (Tailscale only, no Cloudflare/LAN fallback).
+# Authenticates with 916-alien; 4837 must trust 916-alien.pub in its
+# authorized_keys (admin user -> %ProgramData%\ssh\administrators_authorized_keys).
+Host 4837
+    User ahazan2
+    HostName 100.123.87.44
+    IdentityFile ~/.ssh/916-alien
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
