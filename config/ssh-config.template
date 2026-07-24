@@ -157,3 +157,16 @@ Host 4837
     IdentitiesOnly yes
     ServerAliveInterval 30
     ServerAliveCountMax 3
+
+# Windows dev peer 916 (Tailscale only, no Cloudflare/LAN fallback).
+# Powered on intermittently — verify it is online before relying on it:
+#   tailscale status | grep 916   (looks for "active", not "offline")
+# Authenticates with 916-alien; 916 must trust 916-alien.pub in its
+# authorized_keys (admin user -> %ProgramData%\ssh\administrators_authorized_keys).
+Host 916
+    User ahazan2
+    HostName 100.110.219.31
+    IdentityFile ~/.ssh/916-alien
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
