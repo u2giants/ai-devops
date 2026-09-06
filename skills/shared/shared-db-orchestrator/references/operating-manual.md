@@ -205,8 +205,14 @@ node scripts/manage-migration-author-lanes.mjs --assign-reviewer \
 
 The GitHub-backed cursor rotates Grok 4.6, GLM 5.3, Kimi K3, Muse Spark 1.3
 Contributor, and Gemini 3.8 Flash, then repeats across machines and restarts.
-Gemini is eligible only where `ai-review-preflight status gemini` currently
-reports `available`; otherwise the selector skips it. Retrying the same
+A provider is eligible only where `ai-review-preflight usable <provider>` exits
+zero and reports `"usable": true`; otherwise the selector skips it. That one
+command is the whole answer: it merges the reviewer registry (the roster of
+record, `config/reviewer-registry.json` in `popcre/ai-devops`), any temporary
+quarantine, and the standing live-qualification requirement. Never keep a second
+roster anywhere, and never read a provider's own `doctor` output as permission —
+a green `doctor` proves the local install works, not that the reviewer may be
+drawn. Retrying the same
 issue/PR/head returns the same assignment. Use only the returned wrapper:
 `ai-grok-review`, `ai-glm`, `ai-kimi`, `ai-muse`, `ai-gemini`, or — for the
 overflow provider below — `ai-codex-review`. Never override its model or
@@ -243,7 +249,10 @@ when every eligible reviewer is genuinely busy, not to review contentious work.
 
 **The retired `glm-5.2` label receives no new work** until an explicit owner
 instruction restores it. Qwen 3.8 Max is no longer retired (owner instruction,
-2026-09-04); it is gated only by its own preflight qualification. Historical
+2026-09-04) and is `active` in the reviewer registry; it is gated only by its
+own preflight qualification, which as of 2026-09-04 still fails — a live probe
+returns no terminal result within 900s, so `usable qwen` stays false and the
+quarantine correctly remains. Historical
 assignments, failures, and replacement evidence stay readable and must be
 recovered through `scripts/manage-migration-author-lanes.mjs`, never
 hand-edited.

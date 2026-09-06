@@ -155,10 +155,13 @@ Albert approved concurrent migration authoring on 2026-08-14.
 - Outside-sourced writes into curated `core.*` Master Data remain governed through `route: curated-master-data-governance`, but they never consume a migration-author lane.
 - Assign each exact-head issue one external reviewer from the durable round robin after excluding
   the live orchestrator engine: Codex never reviews a Codex-orchestrated issue, and Claude never
-  reviews a Claude-orchestrated issue. Gemini may receive read-only assignments only on a host
-  where `ai-review-preflight status gemini` currently reports `available`; runtime, wrapper, or
-  model drift returns it to quarantine. Qwen is treated like any other reviewer; it may
-  receive assignments once `ai-review-preflight status qwen` reports `available`.
+  reviews a Claude-orchestrated issue. Before drawing any reviewer, ask the one
+  question that has one answer: `ai-review-preflight usable <provider>`. It exits zero and
+  reports `"usable": true` only when the reviewer registry lists the provider as `active`,
+  no quarantine is in force, and any standing live qualification currently holds. Gemini and
+  Qwen additionally require their own live qualification, and runtime, wrapper, or model
+  drift returns either to quarantine automatically. Never substitute a provider's own
+  `doctor` output for this check, and never keep a second roster.
 
 Acquire a lane from the shared-db checkout:
 

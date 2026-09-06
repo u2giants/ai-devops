@@ -8,7 +8,7 @@
 # assigning the same unhealthy provider again.
 set -euo pipefail
 
-VERSION="1.1.2"
+VERSION="1.2.0"
 STATE_DIR="${AI_REVIEW_QUARANTINE_DIR:-$HOME/.local/state/ai-devops/review-quarantine}"
 CHECK_TIMEOUT="${AI_REVIEW_PREFLIGHT_TIMEOUT:-10}"
 COOLDOWN="${AI_REVIEW_QUARANTINE_SECONDS:-1800}"
@@ -20,6 +20,42 @@ need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required but not installe
 
 valid_provider() { case "$1" in claude|grok|kimi|glm|muse|gemini|qwen|codex|deepseek) return 0 ;; *) return 1 ;; esac; }
 provider_file() { printf '%s/%s.json' "$STATE_DIR" "$1"; }
+# The installers publish this tool as a symlink or shim, so the repository root
+# is not always the parent of the directory the caller invoked.
+resolve_registry() {
+  local candidate real
+  candidate="$SCRIPT_DIR/../config/reviewer-registry.json"
+  [ -f "$candidate" ] || { real="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+    [ -z "$real" ] || candidate="$(dirname "$real")/../config/reviewer-registry.json"; }
+  printf '%s' "$candidate"
+}
+REGISTRY_FILE="${AI_REVIEW_REGISTRY:-$(resolve_registry)}"
+# The roster of record. A provider can be locally healthy and still ineligible,
+# so every "can I use this reviewer" answer must consult this file as well as
+# the quarantine and live-qualification state. There is exactly one roster.
+provider_eligibility() { # PROVIDER -> active|historical-only
+  local value
+  [ -f "$REGISTRY_FILE" ] || die "reviewer registry is missing: $REGISTRY_FILE"
+  value="$(jq -r --arg p "$1" '.providers[$p].eligibility // empty' "$REGISTRY_FILE" 2>/dev/null)" \
+    || die "reviewer registry is not readable JSON: $REGISTRY_FILE"
+  case "$value" in
+    active|historical-only) printf '%s' "$value" ;;
+    *) die "reviewer registry does not declare an eligibility for '$1'." ;;
+  esac
+}
+REGISTRY_FILE="${AI_REVIEW_REGISTRY:-$SCRIPT_DIR/../config/reviewer-registry.json}"
+# The roster of record. A provider can be locally healthy and still ineligible,
+# so every "can I use this reviewer" answer must consult this file as well as
+# the quarantine and live-qualification state. There is exactly one roster.
+provider_eligibility() { # PROVIDER -> active|historical-only
+  local value
+  [ -f "$REGISTRY_FILE" ] || die "reviewer registry is missing: $REGISTRY_FILE"
+  value="$(jq -r --arg p "$1" '.providers[$p].eligibility // empty' "$REGISTRY_FILE" 2>/dev/null)"     || die "reviewer registry is not readable JSON: $REGISTRY_FILE"
+  case "$value" in
+    active|historical-only) printf '%s' "$value" ;;
+    *) die "reviewer registry does not declare an eligibility for '$1'." ;;
+  esac
+}
 qualification_file() { printf '%s/%s-live-qualified.json' "$STATE_DIR" "$1"; }
 now_epoch() { date +%s; }
 gemini_live_qualified() {
@@ -189,12 +225,40 @@ qualify_gemini() {
   note "ai-review-preflight: Gemini live qualification recorded for wrapper $sha, agy $agy_version, and model $model."
 }
 
+# The single answer to "can I use this reviewer right now". It merges the three
+# layers that used to be able to disagree: the roster of record, the standing
+# live-qualification requirement, and any temporary quarantine.
+provider_usability() { # PROVIDER -> prints one JSON object; 0 usable, 3 not
+  local provider="$1" elig line
+  elig="$(provider_eligibility "$provider")"
+  if [ "$elig" != active ]; then
+    jq -nc --arg p "$provider" --arg e "$elig" \
+      '{provider:$p,status:"ineligible",eligibility:$e,usable:false,reason:("roster-"+$e)}'
+    return 3
+  fi
+  if line="$(static_status "$provider")"; then
+    printf '%s\n' "$line" | jq -c --arg e "$elig" '. + {eligibility:$e,usable:false,reason:.failure_class}'
+    return 3
+  fi
+  if active_quarantine "$provider"; then
+    jq -c --arg e "$elig" '. + {status:"quarantined",eligibility:$e,usable:false,reason:.failure_class}' "$(provider_file "$provider")"
+    return 3
+  fi
+  jq -nc --arg p "$provider" --arg e "$elig" \
+    '{provider:$p,status:"available",eligibility:$e,usable:true,reason:"ok"}'
+}
+
 check_provider() { # PROVIDER REPO LIVE BASE
   local provider="$1" repo="$2" live="$3" base="$4" wrapper sandbox packet tag out rc class
   valid_provider "$provider" || die "unknown provider '$provider'."
+  need jq; need git; need timeout
+  if [ "$(provider_eligibility "$provider")" != active ]; then
+    provider_usability "$provider" >&2 || true
+    note "ai-review-preflight: $provider may not receive new work; the reviewer registry is the roster of record."
+    return 3
+  fi
   [ -d "$repo" ] || die "review directory does not exist: $repo"
   repo="$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null)" || die "not a Git repository: $repo"
-  need jq; need git; need timeout
   if active_quarantine "$provider"; then
     jq -r '"ai-review-preflight: " + .provider + " is quarantined until epoch " + (.expires_epoch|tostring) + " (" + .failure_class + ")."' "$(provider_file "$provider")" >&2
     return 3
@@ -247,6 +311,7 @@ Usage:
   ai-review-preflight clear <provider>
   ai-review-preflight qualify gemini|qwen
   ai-review-preflight status [provider]
+  ai-review-preflight usable <provider>
   ai-review-preflight explain <failure-class>
 EOF
 }
@@ -272,11 +337,11 @@ case "$cmd" in
     provider="${1:-}"
     if [ -n "$provider" ]; then valid_provider "$provider" || die "unknown provider '$provider'."; providers=("$provider")
     else providers=(claude grok kimi glm muse gemini qwen codex deepseek); fi
-    for provider in "${providers[@]}"; do
-      if static_status "$provider"; then :
-      elif active_quarantine "$provider"; then jq -c '. + {status:"quarantined"}' "$(provider_file "$provider")"
-      else printf '{"provider":"%s","status":"available"}\n' "$provider"; fi
-    done ;;
+    for provider in "${providers[@]}"; do provider_usability "$provider" || true; done ;;
+  usable)
+    provider="${1:-}"; valid_provider "$provider" || die "unknown provider '$provider'."
+    [ "$#" -eq 1 ] || die 'usage: ai-review-preflight usable <provider>'
+    provider_usability "$provider" ;;
   explain) explain_failure "${1:-}" ;;
   --version) printf 'ai-review-preflight %s\n' "$VERSION" ;;
   -h|--help) usage ;;

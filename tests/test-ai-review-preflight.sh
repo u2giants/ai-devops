@@ -144,6 +144,25 @@ OUT="$($SCRIPT check kimi "$REPO" 2>&1)"; RC=$?
 for class in allowance-exhausted broken-snapshot empty-assistant-turns turn-exhaustion service-unavailable substantive-finding; do
   check "guidance exists for $class" "$SCRIPT explain '$class' | grep -q ."
 done
+# One answer to "can I use this reviewer right now": roster + quarantine + qualification.
+check "every registered provider carries a single usable verdict" "for p in claude grok kimi glm muse gemini qwen codex deepseek; do $SCRIPT status \"\$p\" | jq -e '.eligibility and (.usable|type==\"boolean\") and .reason' >/dev/null || exit 1; done"
+check "usable reports a healthy active provider as usable" "$SCRIPT usable grok | jq -e '.usable==true and .eligibility==\"active\"'"
+check "usable exits non-zero for a quarantined provider" "$SCRIPT quarantine deepseek authentication-failed >/dev/null 2>&1; ! $SCRIPT usable deepseek >/dev/null"
+check "quarantined provider reports its blocking reason" "$SCRIPT usable deepseek | jq -e '.usable==false and .status==\"quarantined\" and .reason==\"authentication-failed\"' && $SCRIPT clear deepseek 2>/dev/null"
+
+REGISTRY_TEST="$TMP/registry.json"
+jq '.providers.grok.eligibility="historical-only"' "$ROOT/config/reviewer-registry.json" > "$REGISTRY_TEST"
+check "a historical-only provider is not usable even when healthy" "AI_REVIEW_REGISTRY='$REGISTRY_TEST' $SCRIPT usable grok | jq -e '.usable==false and .status==\"ineligible\" and .reason==\"roster-historical-only\"'"
+check "a historical-only provider cannot pass a check" "! AI_REVIEW_REGISTRY='$REGISTRY_TEST' $SCRIPT check grok '$REPO' 2>&1 | grep -q 'health=ok'"
+check "a missing reviewer registry fails closed" "! AI_REVIEW_REGISTRY='$TMP/absent.json' $SCRIPT usable grok"
+check "the registry declares every valid provider" "for p in claude grok kimi glm muse gemini qwen codex deepseek; do jq -e --arg p \"\$p\" '.providers[\$p].eligibility' '$ROOT/config/reviewer-registry.json' >/dev/null || exit 1; done"
+
+# The POSIX installer publishes this tool as a symlink; the registry must still resolve.
+mkdir -p "$TMP/linkbin"
+if ln -sf "$SCRIPT" "$TMP/linkbin/ai-review-preflight" 2>/dev/null && [ -L "$TMP/linkbin/ai-review-preflight" ]; then
+  check "the registry resolves through an installed symlink" "AI_REVIEW_REGISTRY= '$TMP/linkbin/ai-review-preflight' usable grok | jq -e '.usable==true'"
+fi
+
 check "turn exhaustion never recommends more turns" "! $SCRIPT explain turn-exhaustion | grep -Eqi 'higher ceiling|double the turns|--max-turns [0-9]'"
 check "substantive finding stops shopping" "$SCRIPT explain substantive-finding | grep -qi 'Never rotate'"
 

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "description": "The single roster of record for AI reviewers. `ai-review-preflight usable <provider>` is the only supported answer to \"can I use this reviewer right now\"; it combines this roster with the live quarantine and live-qualification state. Nothing else may keep a second reviewer roster.",
+  "eligibility_values": {
+    "active": "may receive new review work, subject to preflight quarantine and live qualification",
+    "historical-only": "withdrawn by owner instruction; may not receive new work regardless of local health"
+  },
+  "providers": {
+    "claude": { "eligibility": "active", "gate_capable": true },
+    "codex": { "eligibility": "active", "gate_capable": true },
+    "grok": { "eligibility": "active", "gate_capable": false },
+    "kimi": { "eligibility": "active", "gate_capable": false },
+    "glm": { "eligibility": "active", "gate_capable": false },
+    "muse": { "eligibility": "active", "gate_capable": false },
+    "deepseek": { "eligibility": "active", "gate_capable": false },
+    "gemini": { "eligibility": "active", "gate_capable": false, "note": "Activated 2026-09-04 (popcre/ai-devops#280); requires ai-review-preflight qualify gemini." },
+    "qwen": { "eligibility": "active", "gate_capable": false, "note": "The 2026-08-28 retirement was withdrawn by owner instruction on 2026-09-04 (popcre/ai-devops#286); requires ai-review-preflight qualify qwen." }
+  }
+}
