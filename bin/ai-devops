@@ -143,7 +143,7 @@ check_provider_registry() {
       case "$status:$usable" in
         installed-healthy:true) c_ok "review provider $provider is usable: healthy and in the reviewer registry" ;;
         installed-healthy:false) c_warn "review provider $provider is installed and healthy but not in the reviewer registry, so it cannot be assigned a review" ;;
-        quarantined:*) c_warn "review provider $provider is quarantined" ;;
+        quarantined:*) c_warn "review provider $provider registered but quarantined" ;;
         unknown:*) c_warn "review provider $provider live doctor unsupported" ;;
         *) c_fail "review provider $provider status invalid"; FAILED=1 ;;
       esac

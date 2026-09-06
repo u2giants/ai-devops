@@ -46,9 +46,9 @@ cat > "$TMP/bin/ai-review-preflight" <<'EOF'
 #!/usr/bin/env bash
 provider="${2:-unknown}"
 if [ "$provider" = glm ]; then
-  printf '{"provider":"glm","status":"quarantined","failure_class":"allowance-exhausted"}\n'
+  printf '{"provider":"glm","status":"quarantined","failure_class":"allowance-exhausted","usable":false}\n'
 else
-  printf '{"provider":"%s","status":"available"}\n' "$provider"
+  printf '{"provider":"%s","status":"installed-healthy","usable":true}\n' "$provider"
 fi
 EOF
 chmod +x "$TMP/bin/ai-review-preflight"

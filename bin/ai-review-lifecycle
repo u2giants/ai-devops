@@ -133,7 +133,13 @@ begin(){
 # Headings, rules, and bare decision words are not analysis and do not count.
 MIN_REPORT_CHARS="${AI_REVIEW_MIN_REPORT_CHARS:-200}"
 report_substance(){ # FILE -> substantive character count
-  tr -d '' < "$1"     | sed -E -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//'     | grep -Ev '^$'     | grep -Ev '^#{1,6}([[:space:]].*)?$'     | grep -Ev '^([-=_*][[:space:]]*){3,}$'     | grep -Evi '^[[:punct:][:space:]]*(verdict|decision|result|status)?[[:punct:][:space:]]*(approve[d]?|reject(ed)?|blocked|pass(ed)?|fail(ed)?|lgtm|ok|no[[:space:]]issues[[:space:]]found)[[:punct:][:space:]]*[0-9a-f]*[[:punct:][:space:]]*$'     | tr -d '[:space:]' | wc -c | tr -d ' '
+  tr -d '\r' < "$1" \
+    | sed -E -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//' \
+    | grep -Ev '^$' \
+    | grep -Ev '^#{1,6}([[:space:]].*)?$' \
+    | grep -Ev '^([-=_*][[:space:]]*){3,}$' \
+    | grep -Evi '^[[:punct:][:space:]]*(verdict|decision|result|status)?[[:punct:][:space:]]*(approve[d]?|reject(ed)?|blocked|pass(ed)?|fail(ed)?|lgtm|ok|no[[:space:]]issues[[:space:]]found)[[:punct:][:space:]]*[0-9a-f]*[[:punct:][:space:]]*$' \
+    | tr -d '[:space:]' | wc -c | tr -d ' '
 }
 
 terminal(){ # finish|fail args
