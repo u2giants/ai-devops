@@ -48,6 +48,22 @@ substitute the standard tier. A measured follow-up call reused the exact session
 recalled the prior turn; it also reported a large cache read. Provider cost is still
 reported only when OpenCode supplies it.
 
+## Context window and prompt caching
+
+Set on 2026-09-05 and enforced byte-for-byte by `ai-muse` at every turn:
+
+- The provider package is `@ai-sdk/openai`, matching Meta's own OpenCode catalog
+  entry. The generic OpenAI-compatible package silently drops the caching options.
+- Context limit 1,048,576 tokens, output 65,536 — Meta's published maximum.
+- Compaction keeps history instead of pruning it: `prune` off, `tail_turns` 8,
+  `reserved` 32,768.
+- An explicit cache key `ai-devops-muse-review` with 24-hour retention, plus
+  `cache_read` pricing so cached tokens are accounted for.
+
+Meta already served implicit prefix caching before this change; a same-config A/B
+confirmed it. What the change adds is the stable key, the retention window, and cost
+visibility. A verified follow-up turn reported 15,473 cached read tokens out of 15,560.
+
 ## Why there is no Muse service
 
 Persistent conversation does not require a permanent process. OpenCode 1.18.12
