@@ -205,8 +205,15 @@ node scripts/manage-migration-author-lanes.mjs --assign-reviewer \
 
 The GitHub-backed cursor rotates Grok 4.6, GLM 5.3, Kimi K3, Muse Spark 1.3
 Contributor, and Gemini 3.8 Flash, then repeats across machines and restarts.
-Gemini is eligible only where `ai-review-preflight status gemini` currently
-reports `available`; otherwise the selector skips it. Retrying the same
+Gemini is eligible only where `ai-review-preflight usable gemini` exits zero;
+otherwise the selector skips it. `usable` is the only command that reconciles
+install health, quarantine, live qualification, and reviewer-registry
+membership. A provider can be `installed-healthy` and still unusable because
+the registry does not carry it, which is Gemini's current state: it was kept
+out after one run that returned no parseable verdict and one that returned a
+bare `PASS` with an empty report. Registry re-entry is a reviewed shared-db
+change backed by a live, well-formed verdict carrying the head SHA and a
+substantive report; it is never an edit made to unblock an allocation. Retrying the same
 issue/PR/head returns the same assignment. Use only the returned wrapper:
 `ai-grok-review`, `ai-glm`, `ai-kimi`, `ai-muse`, `ai-gemini`, or — for the
 overflow provider below — `ai-codex-review`. Never override its model or

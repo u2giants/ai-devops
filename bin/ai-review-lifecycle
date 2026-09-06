@@ -7,7 +7,7 @@
 # join fields used by ai-reviewer-issue.
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_DIR="${AI_REVIEW_LIFECYCLE_DIR:-$HOME/.local/state/ai-devops/review-lifecycle}"
 PREFLIGHT="${AI_REVIEW_PREFLIGHT_BIN:-$SCRIPT_DIR/ai-review-preflight}"
@@ -127,6 +127,15 @@ begin(){
   atomic_json "$state" "$row"; BEGIN_LOCK=""; BEGIN_TOKEN=""; trap - EXIT INT TERM; printf '%s\n' "$state"
 }
 
+# An approval must be backed by a report a human can read. A decision token with
+# no analysis behind it is a counterfeit approval: the runner cannot tell it from
+# a real one, and it would satisfy a merge gate with no review having occurred.
+# Headings, rules, and bare decision words are not analysis and do not count.
+MIN_REPORT_CHARS="${AI_REVIEW_MIN_REPORT_CHARS:-200}"
+report_substance(){ # FILE -> substantive character count
+  tr -d '' < "$1"     | sed -E -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//'     | grep -Ev '^$'     | grep -Ev '^#{1,6}([[:space:]].*)?$'     | grep -Ev '^([-=_*][[:space:]]*){3,}$'     | grep -Evi '^[[:punct:][:space:]]*(verdict|decision|result|status)?[[:punct:][:space:]]*(approve[d]?|reject(ed)?|blocked|pass(ed)?|fail(ed)?|lgtm|ok|no[[:space:]]issues[[:space:]]found)[[:punct:][:space:]]*[0-9a-f]*[[:punct:][:space:]]*$'     | tr -d '[:space:]' | wc -c | tr -d ' '
+}
+
 terminal(){ # finish|fail args
   local operation="$1"; shift; local state="" verdict="" report="" elapsed="" failure="" current row report_sha="" stale=false scoreboard_rc=0 now
   while [ "$#" -gt 0 ]; do case "$1" in
@@ -138,6 +147,10 @@ terminal(){ # finish|fail args
   if [ "$operation" = finish ]; then case "$verdict" in APPROVE|REJECT|BLOCKED) ;; *) die "finish requires APPROVE, REJECT, or BLOCKED.";; esac
   else verdict=BLOCKED; [ -n "$failure" ] || failure=provider-failed; fi
   if [ -n "$report" ]; then [ -f "$report" ] && [ ! -L "$report" ] || die "report is not a regular file: $report"; report="$(cd "$(dirname "$report")" && pwd -P)/$(basename "$report")"; report_sha="$(sha256sum "$report"|cut -d' ' -f1)"; fi
+  if [ "$operation" = finish ] && { [ "$verdict" = APPROVE ] || [ "$verdict" = REJECT ]; }; then
+    if [ -z "$report" ]; then verdict=BLOCKED; failure=empty-report
+    elif [ "$(report_substance "$report")" -lt "$MIN_REPORT_CHARS" ]; then verdict=BLOCKED; failure=empty-report; fi
+  fi
   current="$($DIGEST digest "$(jq -r .repository_root "$state")")" || die "could not verify source at terminal transition."
   if [ "$current" != "$(jq -r .source_digest "$state")" ]; then stale=true; verdict=BLOCKED; failure=stale-source; fi
   now="$(date -u +%FT%TZ)"
