@@ -43,19 +43,6 @@ provider_eligibility() { # PROVIDER -> active|historical-only
     *) die "reviewer registry does not declare an eligibility for '$1'." ;;
   esac
 }
-REGISTRY_FILE="${AI_REVIEW_REGISTRY:-$SCRIPT_DIR/../config/reviewer-registry.json}"
-# The roster of record. A provider can be locally healthy and still ineligible,
-# so every "can I use this reviewer" answer must consult this file as well as
-# the quarantine and live-qualification state. There is exactly one roster.
-provider_eligibility() { # PROVIDER -> active|historical-only
-  local value
-  [ -f "$REGISTRY_FILE" ] || die "reviewer registry is missing: $REGISTRY_FILE"
-  value="$(jq -r --arg p "$1" '.providers[$p].eligibility // empty' "$REGISTRY_FILE" 2>/dev/null)"     || die "reviewer registry is not readable JSON: $REGISTRY_FILE"
-  case "$value" in
-    active|historical-only) printf '%s' "$value" ;;
-    *) die "reviewer registry does not declare an eligibility for '$1'." ;;
-  esac
-}
 qualification_file() { printf '%s/%s-live-qualified.json' "$STATE_DIR" "$1"; }
 now_epoch() { date +%s; }
 gemini_live_qualified() {

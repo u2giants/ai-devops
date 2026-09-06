@@ -160,7 +160,12 @@ check "the registry declares every valid provider" "for p in claude grok kimi gl
 # The POSIX installer publishes this tool as a symlink; the registry must still resolve.
 mkdir -p "$TMP/linkbin"
 if ln -sf "$SCRIPT" "$TMP/linkbin/ai-review-preflight" 2>/dev/null && [ -L "$TMP/linkbin/ai-review-preflight" ]; then
-  check "the registry resolves through an installed symlink" "AI_REVIEW_REGISTRY= '$TMP/linkbin/ai-review-preflight' usable grok | jq -e '.usable==true'"
+  LINK_OUT="$(AI_REVIEW_REGISTRY= "$TMP/linkbin/ai-review-preflight" usable grok 2>&1)"; LINK_RC=$?
+  if [ "$LINK_RC" -eq 0 ] && printf '%s' "$LINK_OUT" | jq -e '.usable==true' >/dev/null 2>&1; then
+    ok "the registry resolves through an installed symlink"
+  else
+    bad "the registry resolves through an installed symlink (rc=$LINK_RC out=$LINK_OUT)"
+  fi
 fi
 
 check "turn exhaustion never recommends more turns" "! $SCRIPT explain turn-exhaustion | grep -Eqi 'higher ceiling|double the turns|--max-turns [0-9]'"
