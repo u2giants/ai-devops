@@ -133,15 +133,18 @@ check_memory_and_schedule() {
 }
 
 check_provider_registry() {
-  local provider status
+  local provider status line usable
   if have ai-review-preflight; then
     while IFS= read -r provider; do
       [ -n "$provider" ] || continue
-      status="$(ai-review-preflight status "$provider" 2>/dev/null | jq -r '.status' 2>/dev/null || echo invalid)"
-      case "$status" in
-        available) c_ok "review provider $provider registered and available" ;;
-        quarantined) c_warn "review provider $provider registered but quarantined" ;;
-        unknown) c_warn "review provider $provider registered; live doctor unsupported" ;;
+      line="$(ai-review-preflight status "$provider" 2>/dev/null || true)"
+      status="$(printf '%s' "$line" | jq -r '.status' 2>/dev/null || echo invalid)"
+      usable="$(printf '%s' "$line" | jq -r '.usable' 2>/dev/null || echo invalid)"
+      case "$status:$usable" in
+        installed-healthy:true) c_ok "review provider $provider is usable: healthy and in the reviewer registry" ;;
+        installed-healthy:false) c_warn "review provider $provider is installed and healthy but not in the reviewer registry, so it cannot be assigned a review" ;;
+        quarantined:*) c_warn "review provider $provider registered but quarantined" ;;
+        unknown:*) c_warn "review provider $provider live doctor unsupported" ;;
         *) c_fail "review provider $provider status invalid"; FAILED=1 ;;
       esac
     done <<'EOF'

@@ -8,11 +8,28 @@
 # assigning the same unhealthy provider again.
 set -euo pipefail
 
-VERSION="1.1.2"
+VERSION="1.2.0"
 STATE_DIR="${AI_REVIEW_QUARANTINE_DIR:-$HOME/.local/state/ai-devops/review-quarantine}"
 CHECK_TIMEOUT="${AI_REVIEW_PREFLIGHT_TIMEOUT:-10}"
 COOLDOWN="${AI_REVIEW_QUARANTINE_SECONDS:-1800}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Registry membership is a separate gate from install health. A provider whose
+# doctor passes is still unusable if the allocating registry does not carry it.
+# bin/* is symlinked onto PATH, so resolve the real script location before
+# looking for the repository's config directory; $SCRIPT_DIR is the symlink dir.
+REGISTRY_REAL_DIR="$SCRIPT_DIR"
+if command -v readlink >/dev/null 2>&1; then
+  REGISTRY_REAL_SOURCE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+  [ -z "$REGISTRY_REAL_SOURCE" ] || REGISTRY_REAL_DIR="$(cd "$(dirname "$REGISTRY_REAL_SOURCE")" && pwd)"
+fi
+REGISTRY_FILE="${AI_REVIEW_REGISTRY_FILE:-}"
+if [ -z "$REGISTRY_FILE" ]; then
+  for candidate in "$REGISTRY_REAL_DIR/../config/reviewer-registry.json"                    "$SCRIPT_DIR/../config/reviewer-registry.json"                    "${AI_DEVOPS_CONFIG_DIR:-/etc/ai-devops}/reviewer-registry.json"; do
+    [ -f "$candidate" ] || continue
+    REGISTRY_FILE="$candidate"; break
+  done
+  [ -n "$REGISTRY_FILE" ] || REGISTRY_FILE="$REGISTRY_REAL_DIR/../config/reviewer-registry.json"
+fi
 
 die()  { printf 'ai-review-preflight: error: %s\n' "$*" >&2; exit 1; }
 note() { printf '%s\n' "$*" >&2; }
@@ -64,6 +81,43 @@ qwen_preloader_sha() { # WRAPPER [DOCTOR_OUTPUT]
   value="$(printf '%s\n' "$out" | sed -n 's/^qwen preloader sha256:[[:space:]]*\([0-9a-f]\{64\}\)$/\1/p')"
   [ -n "$value" ] || return 1; printf '%s' "$value"
 }
+registry_state() { # PROVIDER -> registered|absent|unknown
+  local value
+  [ -f "$REGISTRY_FILE" ] || { printf unknown; return; }
+  value="$(jq -r --arg p "$1" '.providers[$p].registry_state // "unknown"' "$REGISTRY_FILE" 2>/dev/null)" || value=unknown
+  case "$value" in registered|absent) printf '%s' "$value" ;; *) printf unknown ;; esac
+}
+
+registry_reason() { # PROVIDER
+  local value
+  [ -f "$REGISTRY_FILE" ] || { printf 'no reviewer registry at %s, so membership is unverified.' "$REGISTRY_FILE"; return; }
+  value="$(jq -r --arg p "$1" '.providers[$p].reason // "not described in the reviewer registry, so membership is unverified."' "$REGISTRY_FILE" 2>/dev/null)"     || value='reviewer registry is unreadable, so membership is unverified.'
+  printf '%s' "$value"
+}
+
+# health_status PROVIDER prints the install-health object and returns 0 only
+# when the local install is healthy, unquarantined, and live-qualified.
+health_status() { # PROVIDER
+  if static_status "$1"; then return 1; fi
+  if active_quarantine "$1"; then jq -c '. + {status:"quarantined"}' "$(provider_file "$1")"; return 1; fi
+  printf '{"provider":"%s","status":"installed-healthy"}
+' "$1"
+}
+
+# reconciled_status PROVIDER gives one answer across install health, quarantine,
+# live qualification, and allocating-registry membership. It returns 0 only when
+# the provider may actually be given a review right now. "installed-healthy" is
+# deliberately not called "available": health alone never means allocatable.
+reconciled_status() { # PROVIDER
+  local health healthy=0 state reason usable
+  health="$(health_status "$1")" || healthy=1
+  state="$(registry_state "$1")"; reason="$(registry_reason "$1")"
+  if [ "$healthy" = 0 ] && [ "$state" = registered ]; then usable=true; else usable=false; fi
+  printf '%s
+' "$health" | jq -c --arg state "$state" --arg reason "$reason" --argjson usable "$usable"     '. + {registry_state:$state, registry_reason:$reason, usable:$usable}'
+  [ "$usable" = true ]
+}
+
 static_status() {
   case "$1" in
     gemini) gemini_live_qualified && return 1; printf '{"provider":"gemini","status":"quarantined","failure_class":"live-qualification-required"}\n'; return 0 ;;
@@ -129,6 +183,8 @@ explain_failure() {
     turn-exhaustion) printf 'Do not increase the turn ceiling automatically. Check for a vague brief, an oversized change, or reviewer wandering, then narrow the work.\n' ;;
     service-unavailable) printf 'Retry the service check once after a short delay, then wait. Do not misclassify an outage as a code verdict.\n' ;;
     substantive-finding) printf 'Stop and fix the finding. Never rotate providers to shop for a friendlier verdict.\n' ;;
+    empty-report) printf 'The provider returned a decision with no analysis behind it. Treat it as malformed, not as an approval. Re-run the review and require a report; never relax the report floor to let the verdict through.\n' ;;
+    not-registered) printf 'The provider is not carried in the reviewer registry, so it cannot receive a review no matter how healthy its local install is. Re-entry is a reviewed registry change backed by a live well-formed verdict, never an edit made to unblock an allocation.\n' ;;
     authentication-failed|provider-timeout|provider-unhealthy) printf 'Quarantine this provider and correct the named health failure before assigning a review.\n' ;;
     *) die "unknown failure class '$1'." ;;
   esac
@@ -199,6 +255,11 @@ check_provider() { # PROVIDER REPO LIVE BASE
     jq -r '"ai-review-preflight: " + .provider + " is quarantined until epoch " + (.expires_epoch|tostring) + " (" + .failure_class + ")."' "$(provider_file "$provider")" >&2
     return 3
   fi
+  if [ "$(registry_state "$provider")" != registered ]; then
+    printf 'ai-review-preflight: %s is not carried in the reviewer registry and cannot receive a review: %s
+' "$provider" "$(registry_reason "$provider")" >&2
+    return 3
+  fi
   if static_status "$provider" >/dev/null; then
     static_status "$provider" >&2
     case "$provider" in gemini|qwen) return 3 ;; *) return 4 ;; esac
@@ -247,6 +308,7 @@ Usage:
   ai-review-preflight clear <provider>
   ai-review-preflight qualify gemini|qwen
   ai-review-preflight status [provider]
+  ai-review-preflight usable [provider]
   ai-review-preflight explain <failure-class>
 EOF
 }
@@ -272,11 +334,14 @@ case "$cmd" in
     provider="${1:-}"
     if [ -n "$provider" ]; then valid_provider "$provider" || die "unknown provider '$provider'."; providers=("$provider")
     else providers=(claude grok kimi glm muse gemini qwen codex deepseek); fi
-    for provider in "${providers[@]}"; do
-      if static_status "$provider"; then :
-      elif active_quarantine "$provider"; then jq -c '. + {status:"quarantined"}' "$(provider_file "$provider")"
-      else printf '{"provider":"%s","status":"available"}\n' "$provider"; fi
-    done ;;
+    for provider in "${providers[@]}"; do reconciled_status "$provider" || true; done ;;
+  usable)
+    provider="${1:-}"
+    if [ -n "$provider" ]; then valid_provider "$provider" || die "unknown provider '$provider'."; providers=("$provider")
+    else providers=(claude grok kimi glm muse gemini qwen codex deepseek); fi
+    usable_rc=0
+    for provider in "${providers[@]}"; do reconciled_status "$provider" || usable_rc=3; done
+    exit "$usable_rc" ;;
   explain) explain_failure "${1:-}" ;;
   --version) printf 'ai-review-preflight %s\n' "$VERSION" ;;
   -h|--help) usage ;;

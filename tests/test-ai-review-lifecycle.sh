@@ -55,7 +55,16 @@ check "begin_holds_assignment_lock" "[ -d '$LOCK' ]"
 check "duplicate_run_is_rejected" \
   "! '$SCRIPT' begin --provider grok --repo '$R' --run-id run-one --caller codex >/dev/null 2>&1"
 
-REPORT="$TMP/report.md"; printf '# Review\n' > "$REPORT"
+REPORT="$TMP/report.md"
+cat > "$REPORT" <<'REPEOF'
+# Review
+
+Read every changed hunk against the stated intent. The lock release path is
+correct, the digest is recomputed at the terminal transition, and no path
+writes outside managed storage. The scoreboard append is checked and an
+accounting failure keeps the lock for recovery rather than reporting success.
+No blocking findings.
+REPEOF
 $SCRIPT finish --state "$STATE" --verdict APPROVE --report "$REPORT" --elapsed 12 >/dev/null
 check "finish_records_terminal_state" "[ \"\$(jq -r .status '$STATE')\" = completed ]"
 check "finish_releases_owned_lock" "[ ! -d '$LOCK' ]"
@@ -89,6 +98,29 @@ check "unknown_provider_is_rejected" \
 check "claude_is_a_supported_governed_provider" \
   "AI_DEVOPS_TEST_MODE=1 '$SCRIPT' begin --provider claude --repo '$R' --run-id claude-test --caller codex --preflight none >/dev/null"
 check "unknown_command_is_rejected" "! '$SCRIPT' nonsense"
+
+EMPTY_REPORT="$TMP/empty-report.md"
+cat > "$EMPTY_REPORT" <<'EMPTYEOF'
+# Review
+
+APPROVE
+EMPTYEOF
+STATE_EMPTY="$($SCRIPT begin --provider muse --repo "$R" --run-id empty-report --caller codex)"
+$SCRIPT finish --state "$STATE_EMPTY" --verdict APPROVE --report "$EMPTY_REPORT" --elapsed 5 >/dev/null
+check "approval with an empty report is rejected as malformed"   "jq -e '.verdict==\"BLOCKED\" and .failure_class==\"empty-report\"' '$STATE_EMPTY'"
+
+STATE_NOREPORT="$($SCRIPT begin --provider deepseek --repo "$R" --run-id no-report --caller codex)"
+$SCRIPT finish --state "$STATE_NOREPORT" --verdict APPROVE --elapsed 5 >/dev/null
+check "approval with no report at all is rejected as malformed"   "jq -e '.verdict==\"BLOCKED\" and .failure_class==\"empty-report\"' '$STATE_NOREPORT'"
+
+STATE_THIN_REJECT="$($SCRIPT begin --provider glm --repo "$R" --run-id thin-reject --caller codex)"
+$SCRIPT finish --state "$STATE_THIN_REJECT" --verdict REJECT --report "$EMPTY_REPORT" --elapsed 5 >/dev/null
+check "rejection with an empty report is also rejected as malformed"   "jq -e '.verdict==\"BLOCKED\" and .failure_class==\"empty-report\"' '$STATE_THIN_REJECT'"
+
+STATE_SUBSTANTIVE="$($SCRIPT begin --provider kimi --repo "$R" --run-id substantive --caller codex)"
+$SCRIPT finish --state "$STATE_SUBSTANTIVE" --verdict APPROVE --report "$REPORT" --elapsed 5 >/dev/null
+check "an approval backed by a substantive report still completes"   "jq -e '.verdict==\"APPROVE\" and .status==\"completed\"' '$STATE_SUBSTANTIVE'"
+
 
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

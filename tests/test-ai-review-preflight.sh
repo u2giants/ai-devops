@@ -9,6 +9,22 @@ bad(){ printf '  FAIL %s\n' "$1"; FAIL=$((FAIL+1)); }
 check(){ if eval "$2" >/dev/null 2>&1; then ok "$1"; else bad "$1"; fi; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export AI_REVIEW_QUARANTINE_DIR="$TMP/state"
+# Wrapper mechanics are tested against a registry that carries every provider,
+# so these checks measure install health only. Registry membership itself is
+# tested separately below against the repository's real registry.
+export AI_REVIEW_REGISTRY_FILE="$TMP/registry.json"
+cat > "$AI_REVIEW_REGISTRY_FILE" <<'REGEOF'
+{"version":1,"providers":{
+ "claude":{"registry_state":"registered","reason":"test"},
+ "codex":{"registry_state":"registered","reason":"test"},
+ "deepseek":{"registry_state":"registered","reason":"test"},
+ "gemini":{"registry_state":"registered","reason":"test"},
+ "glm":{"registry_state":"registered","reason":"test"},
+ "grok":{"registry_state":"registered","reason":"test"},
+ "kimi":{"registry_state":"registered","reason":"test"},
+ "muse":{"registry_state":"registered","reason":"test"},
+ "qwen":{"registry_state":"registered","reason":"test"}}}
+REGEOF
 export AI_REVIEW_SANDBOX_DIR="$TMP/sandboxes"
 export AI_REVIEW_PREFLIGHT_TIMEOUT=3
 
@@ -80,32 +96,32 @@ check "all active providers are registered" "for p in claude grok kimi glm muse 
 check "Gemini status enforces built-in quarantine" "$SCRIPT status gemini | jq -e '.status==\"quarantined\" and .failure_class==\"live-qualification-required\"'"
 check "Gemini check cannot report healthy while quarantined" "! $SCRIPT check gemini '$REPO' 2>&1 | grep -q 'health=ok'"
 check "tampered Gemini qualification record fails closed" "mkdir -p '$AI_REVIEW_QUARANTINE_DIR'; printf '{\"version\":2,\"provider\":\"gemini\",\"wrapper_sha256\":\"bad\",\"agy_sha256\":\"bad\",\"agy_version\":\"1.1.19\",\"model\":\"gemini-3.8-flash-high\",\"qualified_epoch\":1}\n' > '$AI_REVIEW_QUARANTINE_DIR/gemini-live-qualified.json'; $SCRIPT status gemini | jq -e '.status==\"quarantined\"'"
-check "successful Gemini live qualification durably releases quarantine" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"available\"'"
-check "Gemini qualification remains valid when network-dependent normal doctor is unavailable" "MOCK_GEMINI_NORMAL_DOCTOR_FAIL=1 $SCRIPT qualify gemini && MOCK_GEMINI_NORMAL_DOCTOR_FAIL=1 $SCRIPT status gemini | jq -e '.status==\"available\"'"
+check "successful Gemini live qualification durably releases quarantine" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"installed-healthy\"'"
+check "Gemini qualification remains valid when network-dependent normal doctor is unavailable" "MOCK_GEMINI_NORMAL_DOCTOR_FAIL=1 $SCRIPT qualify gemini && MOCK_GEMINI_NORMAL_DOCTOR_FAIL=1 $SCRIPT status gemini | jq -e '.status==\"installed-healthy\"'"
 check "failed Gemini requalification revokes the prior qualification" "! MOCK_GEMINI_FAIL=1 $SCRIPT qualify gemini && test ! -e '$AI_REVIEW_QUARANTINE_DIR/gemini-live-qualified.json' && $SCRIPT status gemini | jq -e '.status==\"quarantined\"'"
-check "Gemini can be qualified again after a failed requalification" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"available\"'"
+check "Gemini can be qualified again after a failed requalification" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"installed-healthy\"'"
 cp "$TMP/bin/gemini" "$TMP/bin/gemini-race"; chmod +x "$TMP/bin/gemini-race"
 check "wrapper replacement during Gemini canary cannot authorize untested bytes" "rm -f '$AI_REVIEW_QUARANTINE_DIR/gemini-live-qualified.json'; ! MOCK_GEMINI_MUTATE_WRAPPER=1 AI_REVIEW_GEMINI_WRAPPER='$TMP/bin/gemini-race' $SCRIPT qualify gemini && test ! -e '$AI_REVIEW_QUARANTINE_DIR/gemini-live-qualified.json'"
 check "Gemini remains quarantined after a during-canary wrapper replacement" "AI_REVIEW_GEMINI_WRAPPER='$TMP/bin/gemini-race' $SCRIPT status gemini | jq -e '.status==\"quarantined\"'"
-check "Gemini requalification still works after rejecting a race" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"available\"'"
+check "Gemini requalification still works after rejecting a race" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"installed-healthy\"'"
 check "same-version Gemini runtime replacement during canary is rejected" "! MOCK_GEMINI_MUTATE_RUNTIME=1 $SCRIPT qualify gemini && test ! -e '$AI_REVIEW_QUARANTINE_DIR/gemini-live-qualified.json'"
 printf '%064d\n' 0 | tr 0 a > "$MOCK_AGY_SHA_FILE"
-check "Gemini can be requalified after rejecting runtime replacement" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"available\"'"
+check "Gemini can be requalified after rejecting runtime replacement" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"installed-healthy\"'"
 check "Gemini runtime version drift invalidates qualification" "MOCK_AGY_VERSION=1.1.20 $SCRIPT status gemini | jq -e '.status==\"quarantined\"'"
 check "Gemini model drift invalidates qualification" "MOCK_GEMINI_MODEL=gemini-other $SCRIPT status gemini | jq -e '.status==\"quarantined\"'"
 printf '\n# wrapper changed\n' >> "$TMP/bin/gemini"
 check "Gemini wrapper drift invalidates qualification" "$SCRIPT status gemini | jq -e '.status==\"quarantined\"'"
 sed -i '$d' "$TMP/bin/gemini"
-check "Gemini can be requalified after wrapper drift" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"available\"'"
+check "Gemini can be requalified after wrapper drift" "$SCRIPT qualify gemini && $SCRIPT status gemini | jq -e '.status==\"installed-healthy\"'"
 check "Gemini live preflight performs a genuine live probe" "rm -f '$MOCK_GEMINI_LIVE_CONTACT'; $SCRIPT check gemini '$REPO' --live | grep -q 'allowance=live-verified' && test \"\$(wc -l < '$MOCK_GEMINI_LIVE_CONTACT')\" -eq 1"
 check "Qwen status enforces built-in quarantine until live qualification" "$SCRIPT status qwen | jq -e '.status==\"quarantined\" and .failure_class==\"live-qualification-required\"'"
 check "Qwen check cannot report healthy while credits block live qualification" "! $SCRIPT check qwen '$REPO' 2>&1 | grep -q 'health=ok'"
-check "successful Qwen live qualification durably releases quarantine" "$SCRIPT qualify qwen && $SCRIPT status qwen | jq -e '.status==\"available\"'"
+check "successful Qwen live qualification durably releases quarantine" "$SCRIPT qualify qwen && $SCRIPT status qwen | jq -e '.status==\"installed-healthy\"'"
 MOCK_QWEN_CONTACT_FILE="$TMP/qwen-contact"; export MOCK_QWEN_CONTACT_FILE; : > "$MOCK_QWEN_CONTACT_FILE"
 check "failed Qwen requalification revokes the prior qualification" "! MOCK_QWEN_FAIL=1 $SCRIPT qualify qwen && test ! -e '$AI_REVIEW_QUARANTINE_DIR/qwen-live-qualified.json' && $SCRIPT status qwen | jq -e '.status==\"quarantined\"'"
 check "failed Qwen qualification is attempted exactly once" "test \"\$(wc -l < '$MOCK_QWEN_CONTACT_FILE')\" -eq 1"
 unset MOCK_QWEN_CONTACT_FILE
-check "Qwen can be qualified after an evidence-directed failure" "$SCRIPT qualify qwen && $SCRIPT status qwen | jq -e '.status==\"available\"'"
+check "Qwen can be qualified after an evidence-directed failure" "$SCRIPT qualify qwen && $SCRIPT status qwen | jq -e '.status==\"installed-healthy\"'"
 printf '%064d\n' 0 | tr 0 b > "$AI_QWEN_TEST_RUNTIME_FILE"
 check "Qwen runtime changes invalidate prior live qualification" "$SCRIPT status qwen | jq -e '.status==\"quarantined\" and .failure_class==\"live-qualification-required\"'"
 printf '%064d\n' 0 | tr 0 a > "$AI_QWEN_TEST_RUNTIME_FILE"
@@ -115,10 +131,10 @@ printf '%064d\n' 0 | tr 0 c > "$AI_QWEN_TEST_PRELOADER_FILE"
 printf '\n# version changed\n' >> "$TMP/bin/good"
 check "Qwen wrapper changes invalidate prior live qualification" "$SCRIPT status qwen | jq -e '.status==\"quarantined\" and .failure_class==\"live-qualification-required\"'"
 sed -i '$d' "$TMP/bin/good"
-check "Qwen can be requalified after a wrapper change" "$SCRIPT qualify qwen && $SCRIPT status qwen | jq -e '.status==\"available\"'"
-check "Codex status is available with its doctor contract" "$SCRIPT status codex | jq -e '.status==\"available\"'"
+check "Qwen can be requalified after a wrapper change" "$SCRIPT qualify qwen && $SCRIPT status qwen | jq -e '.status==\"installed-healthy\"'"
+check "Codex status is available with its doctor contract" "$SCRIPT status codex | jq -e '.status==\"installed-healthy\"'"
 check "Codex preflight uses its doctor contract" "$SCRIPT check codex '$REPO' | grep -q 'health=ok'"
-check "DeepSeek status is available with its doctor contract" "$SCRIPT status deepseek | jq -e '.status==\"available\"'"
+check "DeepSeek status is available with its doctor contract" "$SCRIPT status deepseek | jq -e '.status==\"installed-healthy\"'"
 check "DeepSeek preflight uses its doctor contract" "$SCRIPT check deepseek '$REPO' | grep -q 'health=ok'"
 mkdir -p "$TMP/noauth-home" "$TMP/noauth-config"
 NOAUTH_OUT="$(HOME="$TMP/noauth-home" AI_DEVOPS_CONFIG_DIR="$TMP/noauth-config" AI_REVIEW_DEEPSEEK_WRAPPER="$ROOT/bin/ai-deepseek-agent" "$SCRIPT" check deepseek "$REPO" 2>&1)"; NOAUTH_RC=$?
@@ -135,7 +151,7 @@ printf '%s' "$OUT" | grep -q authentication-failed && ok "authentication failure
 check "failed provider is quarantined with the shared status contract" "$SCRIPT status kimi | jq -e '.status==\"quarantined\" and .failure_class==\"authentication-failed\"'"
 
 check "quarantine skips provider without contact" "echo old > '$TMP/contact'; AI_REVIEW_KIMI_WRAPPER='$TMP/contact' $SCRIPT check kimi '$REPO' 2>&1 | grep -q quarantined"
-check "clear removes quarantine" "$SCRIPT clear kimi && $SCRIPT status kimi | grep -q available"
+check "clear removes quarantine" "$SCRIPT clear kimi && $SCRIPT status kimi | grep -q installed-healthy"
 
 export AI_REVIEW_KIMI_WRAPPER="$TMP/bin/allowance"
 OUT="$($SCRIPT check kimi "$REPO" 2>&1)"; RC=$?
@@ -146,6 +162,22 @@ for class in allowance-exhausted broken-snapshot empty-assistant-turns turn-exha
 done
 check "turn exhaustion never recommends more turns" "! $SCRIPT explain turn-exhaustion | grep -Eqi 'higher ceiling|double the turns|--max-turns [0-9]'"
 check "substantive finding stops shopping" "$SCRIPT explain substantive-finding | grep -qi 'Never rotate'"
+
+echo '== registry membership is a separate gate from install health'
+REAL_REGISTRY="$ROOT/config/reviewer-registry.json"
+check "shipped reviewer registry is valid JSON" "jq -e '.version==1 and (.providers|type==\"object\")' '$REAL_REGISTRY'"
+check "Gemini is absent from the shipped reviewer registry" "jq -e '.providers.gemini.registry_state==\"absent\"' '$REAL_REGISTRY'"
+check "healthy install alone never reports usable when the registry omits the provider"   "AI_REVIEW_REGISTRY_FILE='$REAL_REGISTRY' $SCRIPT status gemini | jq -e '.usable==false and .registry_state==\"absent\"'"
+check "status no longer calls a merely healthy install available"   "! $SCRIPT status codex | grep -q '\"status\":\"available\"'"
+check "status reports one reconciled answer per provider"   "$SCRIPT status codex | jq -e '.status==\"installed-healthy\" and .usable==true and .registry_state==\"registered\" and (.registry_reason|length>0)'"
+check "usable exits non-zero for a provider the registry omits"   "! AI_REVIEW_REGISTRY_FILE='$REAL_REGISTRY' $SCRIPT usable gemini"
+check "usable exits zero for a registered healthy provider" "$SCRIPT usable codex"
+check "usable names why an omitted provider cannot be used"   "AI_REVIEW_REGISTRY_FILE='$REAL_REGISTRY' $SCRIPT usable gemini | jq -e '.registry_reason|test(\"empty report\")'"
+check "an unregistered provider cannot be preflighted for a review"   "! AI_REVIEW_REGISTRY_FILE='$REAL_REGISTRY' $SCRIPT check gemini '$REPO' 2>&1 | grep -q 'health=ok'"
+check "a missing registry never reports a provider as usable"   "AI_REVIEW_REGISTRY_FILE='$TMP/no-such-registry.json' $SCRIPT status codex | jq -e '.usable==false and .registry_state==\"unknown\"'"
+check "guidance exists for empty-report" "$SCRIPT explain empty-report | grep -qi 'not as an approval'"
+check "guidance exists for not-registered" "$SCRIPT explain not-registered | grep -qi 'registry'"
+
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
