@@ -166,14 +166,19 @@ check "substantive finding stops shopping" "$SCRIPT explain substantive-finding 
 echo '== registry membership is a separate gate from install health'
 REAL_REGISTRY="$ROOT/config/reviewer-registry.json"
 check "shipped reviewer registry is valid JSON" "jq -e '.version==1 and (.providers|type==\"object\")' '$REAL_REGISTRY'"
-check "Gemini is absent from the shipped reviewer registry" "jq -e '.providers.gemini.registry_state==\"absent\"' '$REAL_REGISTRY'"
-check "healthy install alone never reports usable when the registry omits the provider"   "AI_REVIEW_REGISTRY_FILE='$REAL_REGISTRY' $SCRIPT status gemini | jq -e '.usable==false and .registry_state==\"absent\"'"
+check "Gemini is carried in the shipped reviewer registry after live re-qualification"   "jq -e '.providers.gemini.registry_state==\"registered\"' '$REAL_REGISTRY'"
+check "the Gemini entry still records why the empty report mattered"   "jq -e '.providers.gemini.reason|test(\"empty report\")' '$REAL_REGISTRY'"
+# Health alone must still never mean allocatable. Proved against a fixture that
+# omits a provider, so the guard survives any future registry membership change.
+printf '{"version":1,"providers":{"codex":{"registry_state":"absent","reason":"omitted for this fixture"}}}
+' > "$TMP/omitted.json"
+check "healthy install alone never reports usable when the registry omits the provider"   "AI_REVIEW_REGISTRY_FILE='$TMP/omitted.json' $SCRIPT status codex | jq -e '.usable==false and .registry_state==\"absent\"'"
 check "status no longer calls a merely healthy install available"   "! $SCRIPT status codex | grep -q '\"status\":\"available\"'"
 check "status reports one reconciled answer per provider"   "$SCRIPT status codex | jq -e '.status==\"installed-healthy\" and .usable==true and .registry_state==\"registered\" and (.registry_reason|length>0)'"
-check "usable exits non-zero for a provider the registry omits"   "! AI_REVIEW_REGISTRY_FILE='$REAL_REGISTRY' $SCRIPT usable gemini"
+check "usable exits non-zero for a provider the registry omits"   "! AI_REVIEW_REGISTRY_FILE='$TMP/omitted.json' $SCRIPT usable codex"
 check "usable exits zero for a registered healthy provider" "$SCRIPT usable codex"
-check "usable names why an omitted provider cannot be used"   "AI_REVIEW_REGISTRY_FILE='$REAL_REGISTRY' $SCRIPT usable gemini | jq -e '.registry_reason|test(\"empty report\")'"
-check "an unregistered provider cannot be preflighted for a review"   "! AI_REVIEW_REGISTRY_FILE='$REAL_REGISTRY' $SCRIPT check gemini '$REPO' 2>&1 | grep -q 'health=ok'"
+check "usable names why an omitted provider cannot be used"   "AI_REVIEW_REGISTRY_FILE='$TMP/omitted.json' $SCRIPT usable codex | jq -e '.registry_reason|test(\"omitted for this fixture\")'"
+check "an unregistered provider cannot be preflighted for a review"   "! AI_REVIEW_REGISTRY_FILE='$TMP/omitted.json' $SCRIPT check codex '$REPO' 2>&1 | grep -q 'health=ok'"
 check "a missing registry never reports a provider as usable"   "AI_REVIEW_REGISTRY_FILE='$TMP/no-such-registry.json' $SCRIPT status codex | jq -e '.usable==false and .registry_state==\"unknown\"'"
 check "guidance exists for empty-report" "$SCRIPT explain empty-report | grep -qi 'not as an approval'"
 check "guidance exists for not-registered" "$SCRIPT explain not-registered | grep -qi 'registry'"
