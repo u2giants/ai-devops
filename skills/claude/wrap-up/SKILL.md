@@ -6,8 +6,37 @@ description: One-phrase end-of-session closer. Use when the user says "wrap up",
 # wrap-up
 
 One word closes the session properly. Runs the four closing rituals in order
-and ends with a single consolidated report. Skip nothing silently — if a step
+and ends with a single consolidated report. From this point on the session takes
+on no new work — see the scope freeze below. Skip nothing silently — if a step
 doesn't apply, say so in the report.
+
+## Scope freeze — no new work after "wrap up"
+
+The moment a wrap-up is invoked, this session stops taking on new work. That is
+the point of closing: everything after this line is either finishing what is
+already in flight or writing it down for the next session.
+
+- **Finish what is genuinely in progress** — a commit that is written but not
+  pushed, a PR that is open but not merged, a test that is running, a file that
+  is half-edited. Complete it, then stop.
+- **Do NOT start anything new.** No new issue, no new fix, no "while I'm here"
+  cleanup, no refactor you noticed on the way out, no follow-up you thought of
+  yourself. This includes work Albert mentions in passing during the wrap-up and
+  problems you discover while running the closing steps — they go in the
+  handoff, not into this session.
+- **A bug found during wrap-up is a handoff item, not a task.** Write it down
+  with what you saw. Do not fix it. The one exception is a change that makes the
+  session unsafe to leave — an exposed secret, a broken main branch, a
+  half-applied migration — which is finishing, not starting.
+- **This does not license leaving authorized work undone.** Work Albert asked
+  for BEFORE the wrap-up and that is still unfinished is in progress: finish it.
+  The freeze blocks NEW scope, never the original request.
+- **Because nothing new gets done here, the handoff carries the whole load.**
+  Everything deferred by this rule must appear in the handoff file with enough
+  detail that the next session can act on it cold — what it is, where you saw
+  it, why it was deferred, and the exact next step. A deferred item that is not
+  written down is lost work, and that is the failure this rule exists to
+  prevent.
 
 ## Trigger phrases
 
@@ -48,6 +77,9 @@ doesn't apply, say so in the report.
    the static `HANDOFF.md` pointer, legacy migration, and retention). Once it
    passes, if asked whether the handoff is comprehensive enough, answer "Yes"
    with evidence — do not reflexively answer "No, I'll fix it."
+
+   The scope freeze above makes this section load-bearing: every item you
+   declined to start during this wrap-up must be written here, actionable cold.
 
    Concurrency rules, non-negotiable — other agents may be working the same
    checkout right now:
@@ -109,6 +141,8 @@ doesn't apply, say so in the report.
   workstreams means 20 files and that is correct (owner ruling 2026-08-13)]
 - Shipped: [commit SHAs, PR URLs, deploy verified yes/no]
 - Loose ends: [anything Albert should know, or "none"]
+- Deferred by the scope freeze: [what you found or were asked during wrap-up and
+  did NOT do, and where it is written down — or "nothing came up"]
 - Workspace: [uncommitted files decided; branch deleted/kept + why; worktree
   removed/kept + why]
 
