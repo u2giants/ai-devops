@@ -16,6 +16,34 @@ to end a turn with authorized work outstanding. Codex has no mechanical backstop
 for this the way Claude does, so on this client the contract is the only check
 there is.
 
+## Scope freeze — no new work after closeout starts
+
+The moment a wrap-up is invoked, this session stops taking on new work. That is
+the point of closing: everything after this line is either finishing what is
+already in flight or writing it down for the next session.
+
+- **Finish what is genuinely in progress** — a commit that is written but not
+  pushed, a PR that is open but not merged, a test that is running, a file that
+  is half-edited. Complete it, then stop.
+- **Do NOT start anything new.** No new issue, no new fix, no "while I'm here"
+  cleanup, no refactor you noticed on the way out, no follow-up you thought of
+  yourself. This includes work Albert mentions in passing during the wrap-up and
+  problems you discover while running the closing steps — they go in the
+  handoff, not into this session.
+- **A bug found during wrap-up is a handoff item, not a task.** Write it down
+  with what you saw. Do not fix it. The one exception is a change that makes the
+  session unsafe to leave — an exposed secret, a broken main branch, a
+  half-applied migration — which is finishing, not starting.
+- **This does not license leaving authorized work undone.** Work Albert asked
+  for BEFORE the wrap-up and that is still unfinished is in progress: finish it.
+  The freeze blocks NEW scope, never the original request.
+- **Because nothing new gets done here, the handoff carries the whole load.**
+  Everything deferred by this rule must appear in the handoff file with enough
+  detail that the next session can act on it cold — what it is, where you saw
+  it, why it was deferred, and the exact next step. A deferred item that is not
+  written down is lost work, and that is the failure this rule exists to
+  prevent.
+
 ## Procedure
 
 1. **Summarize durable knowledge.** Update only markdown files that future
@@ -39,6 +67,9 @@ there is.
    three-question audit in that standard: answer each question with supporting
    section references, close every gap found, and repeat until all answers are
    yes. A bare "yes" does not pass.
+
+   The scope freeze above makes this gate load-bearing: every item you declined
+   to start during this closeout must be written here, actionable cold.
 
    **Concurrency rules — other agents may be in this same checkout right now:**
    - **Never rewrite the root `HANDOFF.md`.** It is a short static pointer to
@@ -101,6 +132,7 @@ Return one short report:
 - GitHub: branch, commit, push status
 - Verification: commands/checks/live evidence
 - Workspace: uncommitted files decided; branch deleted/kept + why; worktree removed/kept + why
+- Deferred by the scope freeze: what came up during closeout that you did NOT do, and where it is written down / nothing came up
 - Loose ends: none / ...
 ```
 
