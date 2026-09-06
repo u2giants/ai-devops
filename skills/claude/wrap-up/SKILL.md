@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: One-phrase end-of-session closer. Use when the user says "wrap up", "wrap it up", "dflow wrap up", "wrap up dflow", "close out this session", "we're done here", or "end of session" — ANY "wrap up" variant, including project-prefixed ones like "dflow wrap up", routes HERE, not to a ship-only skill. Chains the four closing rituals: docs update FIRST, then secrets sweep, handoff-safe state, and push verification — then gives a single plain-English closing report. This skill OWNS "wrap up"; it delegates the ship step to the project ship skill (dflow → dflow-ship) but never the other way around.
+description: One-phrase end-of-session closer. Use when the user says "wrap up", "wrap it up", "dflow wrap up", "wrap up dflow", "close out this session", "we're done here", or "end of session" — ANY "wrap up" variant, including project-prefixed ones like "dflow wrap up", routes HERE, not to a ship-only skill. Chains the four closing rituals: docs update FIRST, then secrets sweep, handoff-safe state, push verification, workspace close-out (uncommitted files, branch, worktree), and a next-session prompt — then gives a single plain-English closing report. This skill OWNS "wrap up"; it delegates the ship step to the project ship skill (dflow → dflow-ship) but never the other way around.
 ---
 
 # wrap-up
@@ -66,6 +66,36 @@ doesn't apply, say so in the report.
    working trees are clean and pushes landed. Never report "done" on
    unverified evidence.
 
+5. **Close the workspace** — leave no orphaned branch, worktree, or file.
+   Order matters; each gate must pass before the next.
+   - **Uncommitted files:** every modified/untracked path gets an explicit
+     decision — commit it, add it to `.gitignore`, or move it out of the repo.
+     "I'll leave it" is only allowed if you name the file and the reason in the
+     closing report. Never `git clean`, never `git checkout --` over unreviewed
+     work, and never touch a file you did not create this session (another
+     session may own it — see `concurrent-session-clobber-hazards`).
+   - **Branch:** delete the local and remote branch ONLY after proving the work
+     landed — `gh pr view <n> --json state,mergedAt` shows `MERGED`, or the
+     commits are reachable from `origin/main`. A squash merge rewrites SHAs, so
+     test with `git branch --merged origin/main` or by confirming the PR state,
+     not by comparing SHAs. If it is not merged, keep the branch and say so.
+   - **Worktree:** remove this session's worktree only when its tree is clean
+     AND its branch is merged or intentionally preserved. Use the
+     `cleanup-worktree` skill — it owns the safety audit, recovers unique work,
+     and never treats age as proof that deletion is safe. If anything is
+     unmerged or uncertain, LEAVE THE WORKTREE and name it in the report.
+   - **Never** delete a branch, worktree, or checkout that another session is
+     using, and never delete unmerged work to make the report look clean.
+
+6. **Next-session prompt** — end with a copy-paste prompt Albert can drop into a
+   fresh session to resume exactly here. Put it in its own fenced block at the
+   very bottom of the closing report, and make it self-contained: a stranger
+   pasting it into an empty session must be able to continue with no chat
+   context. It states the repo and branch, the one-sentence goal, what is
+   already done, the exact next action, how to verify success, and a pointer to
+   the `HANDOFF.d/` file written in step 3. If the work is genuinely complete,
+   say "No follow-up prompt — this workstream is closed" instead of inventing one.
+
 ## Closing report (plain English, one message)
 
 ```md
@@ -79,6 +109,11 @@ doesn't apply, say so in the report.
   workstreams means 20 files and that is correct (owner ruling 2026-08-13)]
 - Shipped: [commit SHAs, PR URLs, deploy verified yes/no]
 - Loose ends: [anything Albert should know, or "none"]
+- Workspace: [uncommitted files decided; branch deleted/kept + why; worktree
+  removed/kept + why]
+
+Then, as the last thing in the message, the fenced next-session prompt from
+step 6 (or the single line saying the workstream is closed).
 ```
 
 If any step could not be completed (blocked push, failing test), say exactly
