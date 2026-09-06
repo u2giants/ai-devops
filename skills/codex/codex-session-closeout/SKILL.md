@@ -1,6 +1,6 @@
 ---
 name: codex-session-closeout
-description: One-phrase Codex end-of-session closer. Use when the user says "wrap up", "update the .md files", "close out this session", "is everything pushed and committed?", or asks for docs, handoff, secrets, git, and deploy state to be made safe before ending.
+description: One-phrase Codex end-of-session closer. Use when the user says "wrap up", "update the .md files", "close out this session", "is everything pushed and committed?", or asks for docs, handoff, secrets, git, deploy state, worktree/branch cleanup, or a prompt for the next session before ending.
 ---
 
 # Codex Session Closeout
@@ -65,6 +65,30 @@ there is.
    app by the repo's documented deploy path. Do not report "done" from local git
    state alone.
 
+6. **Close the workspace.** Leave no orphaned branch, worktree, or file.
+   - **Uncommitted files:** make an explicit decision for every modified or
+     untracked path — commit, ignore, or move out of the repo. Leaving one is
+     allowed only if you name the file and the reason in the report. Never
+     `git clean` and never discard a file you did not create this session.
+   - **Branch:** delete local and remote branches only after proving the work
+     landed (`gh pr view <n> --json state,mergedAt` shows `MERGED`, or the
+     commits are reachable from `origin/main`). Squash merges rewrite SHAs, so
+     verify by PR state or `git branch --merged origin/main`, never by SHA
+     comparison. Not merged means keep the branch and say so.
+   - **Worktree:** remove this session's worktree only when its tree is clean
+     and its branch is merged or intentionally preserved. Follow the
+     `cleanup-worktree` procedure — recover unique work first, and never treat
+     age as proof that removal is safe. When anything is unmerged or uncertain,
+     leave the worktree in place and name it in the report.
+   - Never delete a branch, worktree, or checkout another session is using, and
+     never delete unmerged work to make the report look clean.
+7. **Next-session prompt.** End the report with a copy-paste prompt that lets a
+   fresh session resume exactly here, in its own fenced block at the very
+   bottom. It must stand alone without chat context: repo and branch, the
+   one-sentence goal, what is already done, the exact next action, how to verify
+   success, and a pointer to the `HANDOFF.d/` file from step 2. If the work is
+   genuinely complete, write "No follow-up prompt — this workstream is closed".
+
 ## Closing Report
 
 Return one short report:
@@ -76,8 +100,12 @@ Return one short report:
 - Secrets: ...
 - GitHub: branch, commit, push status
 - Verification: commands/checks/live evidence
+- Workspace: uncommitted files decided; branch deleted/kept + why; worktree removed/kept + why
 - Loose ends: none / ...
 ```
+
+Then, as the last thing in the message, the fenced next-session prompt from
+step 7 (or the single line saying the workstream is closed).
 
 If any gate failed, report the blocker and the exact next action instead of
 calling the session closed.
