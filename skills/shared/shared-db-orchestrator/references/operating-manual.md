@@ -209,11 +209,13 @@ Gemini is eligible only where `ai-review-preflight usable gemini` exits zero;
 otherwise the selector skips it. `usable` is the only command that reconciles
 install health, quarantine, live qualification, and reviewer-registry
 membership. A provider can be `installed-healthy` and still unusable because
-the registry does not carry it, which is Gemini's current state: it was kept
-out after one run that returned no parseable verdict and one that returned a
-bare `PASS` with an empty report. Registry re-entry is a reviewed shared-db
-change backed by a live, well-formed verdict carrying the head SHA and a
-substantive report; it is never an edit made to unblock an allocation. Retrying the same
+the registry does not carry it. That was Gemini's state until 2026-09-06: it was
+kept out after one run that returned no parseable verdict and one that returned a
+bare `PASS` with an empty report, and it re-entered only after a recorded live
+safety qualification and a live review that returned a well-formed verdict
+carrying the head SHA above a substantive report. Registry re-entry is always a
+reviewed shared-db change backed by that evidence; it is never an edit made to
+unblock an allocation. Retrying the same
 issue/PR/head returns the same assignment. Use only the returned wrapper:
 `ai-grok-review`, `ai-glm`, `ai-kimi`, `ai-muse`, `ai-gemini`, or — for the
 overflow provider below — `ai-codex-review`. Never override its model or

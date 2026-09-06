@@ -5,13 +5,14 @@ description: Use Gemini 3.8 Flash through the ai-gemini wrapper for an independe
 
 # Gemini code review
 
-Gemini 3.8 Flash may be used for an ad-hoc, advisory read-only review when the
-local hash-bound qualification remains current. It may **not** be assigned a
-governed review that satisfies a gate: Gemini is absent from the reviewer
-registry, so `ai-review-preflight usable gemini` exits non-zero and the
-allocator will not draw it. That absence is deliberate — two prior live
-attempts produced no parseable verdict and a bare `PASS` with an empty report.
-Never add it to the registry to make an allocation succeed.
+Gemini 3.8 Flash is a governed reviewer again as of 2026-09-06, and may also be
+used for an ad-hoc advisory read-only review. It was held out after two live
+attempts produced no parseable verdict and a bare `PASS` with an empty report;
+it returned only after a recorded live safety qualification and a live review
+that produced a well-formed verdict above a substantive report. It is drawable
+only while `ai-review-preflight usable gemini` exits zero — the hash-bound
+qualification re-quarantines it on any wrapper, runtime, or model drift. Never
+add a provider to the registry to make an allocation succeed.
 
 Never call `agy` directly or bypass a quarantine. Check both gates before
 assigning work:
