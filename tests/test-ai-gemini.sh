@@ -63,7 +63,9 @@ esac
 cid=conv-good
 if [[ "$args" == *"--conversation"* ]] && [ "${MOCK_MODE:-normal}" = wrongid ]; then cid=conv-wrong; fi
 if [ "${MOCK_MODE:-normal}" = empty ]; then response=''; elif [ "${MOCK_MODE:-normal}" = badverdict ]; then response='## Verdict
-PASS'; else response='## Verdict
+PASS'; elif [ "${MOCK_MODE:-normal}" = governed ]; then response='Findings: none blocking in file.txt.
+VERDICT: APPROVE 1111111111111111111111111111111111111111'; elif [ "${MOCK_MODE:-normal}" = governed-heading ]; then response='## Verdict
+APPROVE'; else response='## Verdict
 APPROVE'; fi
 printf '{"status":"SUCCESS","conversation_id":"%s","response":%s}\n' "$cid" "$(printf %s "$response" | jq -Rs .)"
 EOF
@@ -137,6 +139,12 @@ R3C="$TMP/repo3c"; make_repo "$R3C"; export MOCK_PROTECTED="$R3C"
 check 'same-turn protected ignored-file mutation is rejected' "! new_run '$R3C' protected-ignored mutate-protected-ignored"
 R3D="$TMP/repo3d"; make_repo "$R3D"; mkdir -p "$R3D/.ai/reviews"; printf tracked > "$R3D/.ai/reviews/tracked.md"; git -C "$R3D" add -f .ai/reviews/tracked.md; git -C "$R3D" commit -qm tracked-runtime; export MOCK_PROTECTED="$R3D"
 check 'tracked files inside runtime directories remain protected' "! new_run '$R3D' protected-tracked-runtime mutate-protected-tracked-runtime"
+GH=1111111111111111111111111111111111111111
+RG="$TMP/repo-gov"; make_repo "$RG"
+gov_run(){ (cd "$RG" && MOCK_MODE="$2" "$SCRIPT" new --governed-verdict "$GH" "$1" --prompt review); }
+check 'governed mode emits the terminal verdict on standard output' "gov_run govok governed | tail -1 | grep -qx 'VERDICT: APPROVE $GH'"
+check 'governed mode rejects the non-governed heading verdict' "! gov_run govbad governed-heading"
+check 'governed mode refuses a malformed head SHA' "! (cd '$RG' && MOCK_MODE=governed '$SCRIPT' new --governed-verdict not-a-sha govsha --prompt review)"
 R4="$TMP/repo4"; make_repo "$R4"; check 'normal review writes a durable report' "new_run '$R4' good normal && find '$R4/.ai/reviews' -type f -size +0c | grep -q ."
 check 'completed state stores exact conversation' "jq -e '.status==\"COMPLETE\" and .conversation_id==\"conv-good\"' \"\$(meta_for good)\""
 GOOD_META="$(meta_for good)"; GOOD_COPY="$(jq -r .review_dir "$GOOD_META")"
